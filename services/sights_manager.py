@@ -30,6 +30,7 @@ import zipfile
 from pathlib import Path
 from typing import Callable, Any
 from utils.logger import get_logger
+from services.resource_index_cache import ResourceIndexCache
 
 log = get_logger(__name__)
 
@@ -58,12 +59,14 @@ class SightsManager:
         _cache: 扫描结果缓存
     """
     
-    def __init__(self):
+    def __init__(self, cache_dir: str | Path | None = None):
         """
         初始化 SightsManager。
         """
         self._usersights_path: Path | None = None
         self._cache: dict | None = None
+        self._cache_signature = None
+        self._index_cache = ResourceIndexCache("sights_library", cache_dir=cache_dir)
 
     def discover_usersights_paths(self, configured_sights_path: str | None = None) -> list[dict[str, Any]]:
         """
@@ -287,6 +290,7 @@ class SightsManager:
         
         self._usersights_path = path
         self._cache = None
+        self._cache_signature = None
         log.info(f"UserSights 路径已设置: {path}")
         return True
     
@@ -314,42 +318,62 @@ class SightsManager:
         if not self._usersights_path or not self._usersights_path.exists():
             return {'exists': False, 'path': '', 'items': []}
 
-        if not force_refresh and self._cache is not None:
-            if self._cache.get("path") == str(self._usersights_path) and Path(self._cache["path"]).exists():
-                return self._cache
+        root_signature = self._index_cache.build_root_signature(self._usersights_path)
+        if (
+            not force_refresh
+            and self._cache is not None
+            and self._cache_signature == root_signature
+            and self._cache.get("path") == str(self._usersights_path)
+        ):
+            return self._cache
 
         sights = []
+        cached_records = self._index_cache.load_records(self._usersights_path)
+        next_records: dict[str, dict] = {}
         try:
             for item in self._usersights_path.iterdir():
                 if not item.is_dir():
                     continue
-                
-                # 统计目录内的 .blk 文件数量
-                blk_files = []
-                try:
-                    for fp in item.rglob('*'):
-                        if fp.is_file() and fp.suffix.lower() == '.blk':
-                            blk_files.append(fp)
-                except PermissionError:
-                    log.warning(f"无法访问目录 {item.name}（权限不足）")
-                    continue
-                
-                preview_path = self._find_preview_image(item)
-                cover_url = ""
-                cover_is_default = False
-                if preview_path:
-                    cover_url = self._to_data_url(preview_path)
-                elif default_cover_path and default_cover_path.exists():
-                    cover_url = self._to_data_url(default_cover_path)
-                    cover_is_default = True
 
-                sights.append({
-                    'name': item.name,
-                    'path': str(item),
-                    'file_count': len(blk_files),
-                    'cover_url': cover_url,
-                    'cover_is_default': cover_is_default,
-                })
+                preview_path = self._find_preview_image(item)
+                cover_path = preview_path
+                if not cover_path and default_cover_path and default_cover_path.exists():
+                    cover_path = default_cover_path
+
+                signature = self._index_cache.build_item_signature(item, cover_path)
+                sight = self._index_cache.get_cached_item(cached_records, item.name, signature)
+
+                if sight is None:
+                    blk_files = []
+                    try:
+                        for fp in item.rglob('*'):
+                            if fp.is_file() and fp.suffix.lower() == '.blk':
+                                blk_files.append(fp)
+                    except PermissionError:
+                        log.warning(f"无法访问目录 {item.name}（权限不足）")
+                        continue
+
+                    cover_url = ""
+                    cover_is_default = False
+                    if preview_path:
+                        cover_url = self._to_data_url(preview_path)
+                    elif default_cover_path and default_cover_path.exists():
+                        cover_url = self._to_data_url(default_cover_path)
+                        cover_is_default = True
+
+                    sight = {
+                        'name': item.name,
+                        'path': str(item),
+                        'file_count': len(blk_files),
+                        'cover_url': cover_url,
+                        'cover_is_default': cover_is_default,
+                    }
+                else:
+                    sight['name'] = item.name
+                    sight['path'] = str(item)
+
+                sights.append(sight)
+                next_records[item.name] = self._index_cache.make_record(signature, sight)
         except PermissionError as e:
             log.error(f"扫描炮镜失败（权限不足）: {e}")
         except OSError as e:
@@ -361,6 +385,8 @@ class SightsManager:
             'items': sorted(sights, key=lambda x: x['name'].lower())
         }
         self._cache = result
+        self._cache_signature = root_signature
+        self._index_cache.save_records(self._usersights_path, next_records)
         return result
 
     def rename_sight(self, old_name: str, new_name: str) -> bool:
@@ -403,6 +429,8 @@ class SightsManager:
         try:
             old_dir.rename(new_dir)
             self._cache = None
+            self._cache_signature = None
+            self._index_cache.clear()
             log.info(f"已重命名炮镜: {old_name} -> {new_name}")
             return True
         except PermissionError as e:
@@ -449,6 +477,8 @@ class SightsManager:
             with open(dst, "wb") as f:
                 f.write(raw)
             self._cache = None
+            self._cache_signature = None
+            self._index_cache.clear()
             log.info(f"已更新炮镜封面: {sight_name}")
             return True
         except PermissionError as e:
@@ -693,5 +723,7 @@ class SightsManager:
             progress_callback(100, "导入完成")
 
         self._cache = None
+        self._cache_signature = None
+        self._index_cache.clear()
         log.info(f"炮镜导入成功: {target_dir}")
         return {"ok": True, "target_dir": str(target_dir)}

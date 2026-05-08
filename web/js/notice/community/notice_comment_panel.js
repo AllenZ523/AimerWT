@@ -143,6 +143,7 @@
                 pendingCommentLikes: {},
                 localPinnedComments: {},
                 localPinnedCommentOrder: [],
+                queuedCommentReload: null,
                 renderSequence: 0
             };
         }
@@ -893,7 +894,15 @@
             if (!state.hasMoreComments || state.isLoadingComments || state.isAppendingComments) return;
             state.isAppendingComments = true;
         } else {
-            if (state.isLoadingComments) return;
+            if (state.isLoadingComments) {
+                if (options.force) {
+                    state.queuedCommentReload = {
+                        reset: reset,
+                        allowCacheOnFailure: options.allowCacheOnFailure === true
+                    };
+                }
+                return;
+            }
             state.isLoadingComments = true;
             state.commentLoadError = '';
             if (reset) {
@@ -962,15 +971,17 @@
             _updateComposerState(noticeId);
         }).catch(function (err) {
             if (!_isActiveRender(noticeId, renderSequence)) return;
-            var cachedApplied = _applyCachedCommentSnapshot(noticeId);
+            var cachedApplied = options.allowCacheOnFailure === true && _applyCachedCommentSnapshot(noticeId);
             state.commentLoadError = cachedApplied ? '' : ((err && err.message) || '评论加载失败，请稍后重试');
             if (!cachedApplied) {
                 _showToast(state.commentLoadError);
-                state.totalCount = 0;
-                state.totalLikes = 0;
-                state.noticeLikeCount = 0;
-                state.noticeLiked = false;
-                state.noticeLikers = [];
+                if (!append) {
+                    state.totalCount = 0;
+                    state.totalLikes = 0;
+                    state.noticeLikeCount = 0;
+                    state.noticeLiked = false;
+                    state.noticeLikers = [];
+                }
             }
             _updateStats(noticeId);
             _updateComposerState(noticeId);
@@ -982,7 +993,14 @@
             }
             state.isLoadingComments = false;
             state.isAppendingComments = false;
+            var queuedCommentReload = state.queuedCommentReload;
+            state.queuedCommentReload = null;
             _renderComments(noticeId);
+            if (queuedCommentReload && !append) {
+                setTimeout(function () {
+                    _loadComments(noticeId, queuedCommentReload);
+                }, 0);
+            }
         });
     }
 
@@ -1383,7 +1401,7 @@
 
         container.querySelectorAll('[data-action="retry-comments"]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                _loadComments(noticeId, { reset: true });
+                _loadComments(noticeId, { reset: true, force: true });
             });
         });
     }
@@ -1504,7 +1522,7 @@
                 _cacheCommentSnapshot(noticeId);
                 _renderComments(noticeId);
             } else {
-                _loadComments(noticeId, { reset: true });
+	                _loadComments(noticeId, { reset: true, force: true });
             }
         }).catch(function (err) {
             // 失败时回滚

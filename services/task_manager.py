@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 from utils.logger import get_logger
 from utils.utils import get_app_data_dir
+from services.resource_index_cache import ResourceIndexCache
 
 log = get_logger(__name__)
 
@@ -45,7 +46,7 @@ class TaskManager:
         task_library_dir: 任务库目录
     """
 
-    def __init__(self, task_library_dir: str | None = None):
+    def __init__(self, task_library_dir: str | None = None, cache_dir: str | Path | None = None):
         """初始化 TaskManager。"""
         self.root_dir = get_app_data_dir()
 
@@ -56,6 +57,8 @@ class TaskManager:
             self.task_library_dir = self.root_dir / DIR_TASK_LIBRARY
 
         self._items_cache = None
+        self._items_cache_signature = None
+        self._index_cache = ResourceIndexCache("task_library", cache_dir=cache_dir)
         self._ensure_dirs()
 
     def update_paths(self, task_library_dir: str | None = None) -> dict[str, bool]:
@@ -93,6 +96,8 @@ class TaskManager:
                         log.error(f"无法创建任务库目录: {e}")
                         return result
                 self.task_library_dir = new_path
+                self._items_cache = None
+                self._items_cache_signature = None
                 result['task_library_updated'] = True
                 log.info(f"任务库路径已更新: {new_path}")
 
@@ -132,21 +137,26 @@ class TaskManager:
 
     # ==================== 列表扫描 ====================
 
-    def scan_items(self) -> list[dict]:
+    def scan_items(self, force_refresh: bool = False) -> list[dict]:
         """
         扫描任务库目录，枚举所有子文件夹，返回前端展示用列表。
 
         Returns:
             列表，每项包含 name / path / size_bytes / cover_url / date 字段
         """
-        if self._items_cache is not None:
-            return self._items_cache
-
         lib_dir = self.task_library_dir
         if not lib_dir.exists() or not lib_dir.is_dir():
+            self._items_cache = []
+            self._items_cache_signature = None
             return []
 
+        root_signature = self._index_cache.build_root_signature(lib_dir)
+        if not force_refresh and self._items_cache is not None and self._items_cache_signature == root_signature:
+            return self._items_cache
+
         items: list[dict] = []
+        cached_records = self._index_cache.load_records(lib_dir)
+        next_records: dict[str, dict] = {}
         try:
             for entry in sorted(lib_dir.iterdir(), key=lambda p: p.name.lower()):
                 if not entry.is_dir():
@@ -155,24 +165,34 @@ class TaskManager:
                 if entry.name.startswith("."):
                     continue
 
-                size_bytes = self._get_dir_size_fast(entry)
-                cover_url = self._find_cover_data_url(entry)
-                mtime = self._get_dir_mtime(entry)
+                cover_path = self._find_cover_path(entry)
+                signature = self._index_cache.build_item_signature(entry, cover_path)
+                item = self._index_cache.get_cached_item(cached_records, entry.name, signature)
 
-                items.append({
-                    "name": entry.name,
-                    "path": str(entry),
-                    "size_bytes": size_bytes,
-                    "cover_url": cover_url,
-                    "cover_is_default": not bool(cover_url),
-                    "date": mtime,
-                })
+                if item is None:
+                    cover_url = self._to_data_url(cover_path) if cover_path else ""
+                    item = {
+                        "name": entry.name,
+                        "path": str(entry),
+                        "size_bytes": self._get_dir_size_fast(entry),
+                        "cover_url": cover_url,
+                        "cover_is_default": not bool(cover_url),
+                        "date": self._get_dir_mtime(entry),
+                    }
+                else:
+                    item["name"] = entry.name
+                    item["path"] = str(entry)
+
+                items.append(item)
+                next_records[entry.name] = self._index_cache.make_record(signature, item)
         except PermissionError as e:
             log.error(f"扫描任务库目录权限不足: {e}")
         except OSError as e:
             log.error(f"扫描任务库目录失败: {e}")
 
         self._items_cache = items
+        self._items_cache_signature = root_signature
+        self._index_cache.save_records(lib_dir, next_records)
         return items
 
     # ==================== 重命名 ====================
@@ -211,6 +231,8 @@ class TaskManager:
         try:
             old_path.rename(new_path)
             self._items_cache = None
+            self._items_cache_signature = None
+            self._index_cache.clear()
             log.info(f"任务重命名成功: {old_name} -> {new_name}")
             return True
         except OSError as e:
@@ -249,6 +271,8 @@ class TaskManager:
         try:
             cover_path.write_bytes(img_bytes)
             self._items_cache = None
+            self._items_cache_signature = None
+            self._index_cache.clear()
             log.info(f"任务封面已更新: {item_name}")
             return True
         except OSError as e:
@@ -277,21 +301,24 @@ class TaskManager:
         在目录中查找封面图片，编码为 data URL 返回。
         查找顺序: cover.png > cover.jpg > preview.png > preview.jpg > 任意图片
         """
-        # 按优先级查找具名封面
+        cover_path = self._find_cover_path(dir_path)
+        return self._to_data_url(cover_path) if cover_path else ""
+
+    def _find_cover_path(self, dir_path: Path) -> Path | None:
+        """在目录中查找封面图片路径。"""
         for name in COVER_SEARCH_NAMES:
             cover = dir_path / name
             if cover.exists() and cover.is_file():
-                return self._to_data_url(cover)
+                return cover
 
-        # 后备方案：查找目录顶层任意图片
         try:
             for entry in dir_path.iterdir():
                 if entry.is_file() and entry.suffix.lower() in IMAGE_EXTENSIONS:
-                    return self._to_data_url(entry)
+                    return entry
         except (PermissionError, OSError):
             pass
 
-        return ""
+        return None
 
     def _to_data_url(self, file_path: Path) -> str:
         """将图片文件编码为 data URL。"""

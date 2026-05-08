@@ -1553,72 +1553,48 @@ func initRouter(r *gin.Engine) {
 			return
 		}
 
-		var actor TelemetryRecord
-		db.Select("is_admin").Where("machine_id = ?", req.MachineID).First(&actor)
+		status := "added"
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			var existingReactions []NoticeReaction
+			if err := tx.Select("id", "emoji").
+				Where("notice_id = ? AND machine_id = ?", req.NoticeID, req.MachineID).
+				Find(&existingReactions).Error; err != nil {
+				return err
+			}
 
-		if !actor.IsAdmin {
-			status := "added"
-			if err := db.Transaction(func(tx *gorm.DB) error {
-				var existingReactions []NoticeReaction
-				if err := tx.Select("id", "emoji").
-					Where("notice_id = ? AND machine_id = ?", req.NoticeID, req.MachineID).
-					Find(&existingReactions).Error; err != nil {
+			hasSameEmoji := false
+			for _, reaction := range existingReactions {
+				if reaction.Emoji == req.Emoji {
+					hasSameEmoji = true
+					break
+				}
+			}
+
+			if len(existingReactions) > 0 {
+				if err := tx.Where("notice_id = ? AND machine_id = ?", req.NoticeID, req.MachineID).
+					Delete(&NoticeReaction{}).Error; err != nil {
 					return err
 				}
-
-				hasSameEmoji := false
-				for _, reaction := range existingReactions {
-					if reaction.Emoji == req.Emoji {
-						hasSameEmoji = true
-						break
-					}
-				}
-
-				if len(existingReactions) > 0 {
-					if err := tx.Where("notice_id = ? AND machine_id = ?", req.NoticeID, req.MachineID).
-						Delete(&NoticeReaction{}).Error; err != nil {
-						return err
-					}
-				}
-
-				if hasSameEmoji {
-					status = "removed"
-					return nil
-				}
-				if len(existingReactions) > 0 {
-					status = "replaced"
-				}
-
-				return tx.Create(&NoticeReaction{
-					NoticeID:  req.NoticeID,
-					MachineID: req.MachineID,
-					Emoji:     req.Emoji,
-				}).Error
-			}); err != nil {
-				c.JSON(500, gin.H{"error": "保存失败"})
-				return
 			}
-			c.JSON(200, gin.H{"status": status})
-			return
-		}
 
-		var existing NoticeReaction
-		if err := db.Where("notice_id = ? AND machine_id = ? AND emoji = ?", req.NoticeID, req.MachineID, req.Emoji).First(&existing).Error; err == nil {
-			db.Delete(&existing)
-			c.JSON(200, gin.H{"status": "removed"})
-			return
-		}
+			if hasSameEmoji {
+				status = "removed"
+				return nil
+			}
+			if len(existingReactions) > 0 {
+				status = "replaced"
+			}
 
-		newReaction := NoticeReaction{
-			NoticeID:  req.NoticeID,
-			MachineID: req.MachineID,
-			Emoji:     req.Emoji,
-		}
-		if err := db.Create(&newReaction).Error; err != nil {
+			return tx.Create(&NoticeReaction{
+				NoticeID:  req.NoticeID,
+				MachineID: req.MachineID,
+				Emoji:     req.Emoji,
+			}).Error
+		}); err != nil {
 			c.JSON(500, gin.H{"error": "保存失败"})
 			return
 		}
-		c.JSON(200, gin.H{"status": "added"})
+		c.JSON(200, gin.H{"status": status})
 	})
 
 	r.GET("/notice-reactions/:notice_id", func(c *gin.Context) {

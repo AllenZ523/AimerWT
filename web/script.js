@@ -2464,6 +2464,20 @@ const app = {
         if (normalizedMsg && normalizedMsg === this._lastLogHtml && (now - this._lastLogAt) < 500) {
             return;
         }
+        if (normalizedMsg) {
+            const recent = this._recentLogFingerprints || (this._recentLogFingerprints = new Map());
+            for (const [msg, ts] of recent) {
+                if ((now - ts) > 5000) recent.delete(msg);
+            }
+            if (recent.has(normalizedMsg)) {
+                return;
+            }
+            recent.set(normalizedMsg, now);
+            if (recent.size > 80) {
+                const oldestKey = recent.keys().next().value;
+                recent.delete(oldestKey);
+            }
+        }
 
         this._lastLogHtml = normalizedMsg;
         this._lastLogAt = now;

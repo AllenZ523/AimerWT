@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -1090,47 +1091,54 @@ func initCommunityClientRoutes(r *gin.Engine) {
 			return
 		}
 
-		// 确认评论存在
 		var comment NoticeComment
 		if err := db.First(&comment, req.CommentID).Error; err != nil {
 			c.JSON(404, gin.H{"error": "评论不存在"})
 			return
 		}
 
-		// Toggle 逻辑
-		var existing NoticeCommentLike
-		err := db.Where("comment_id = ? AND machine_id = ?", req.CommentID, req.MachineID).First(&existing).Error
-		if err == nil {
-			// 已点赞 → 取消
-			db.Delete(&existing)
-			db.Model(&comment).Update("like_count", gorm.Expr("CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END"))
-			db.First(&comment, req.CommentID)
-			weightCfg := LoadCommentWeightConfig()
-			replyCount := 0
-			if comment.ParentID == 0 {
-				replyCount = buildReplyCountMap(comment.NoticeID, []uint{comment.ID})[comment.ID]
+		liked := false
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.First(&comment, req.CommentID).Error; err != nil {
+				return err
 			}
-			authorWeight := buildCommentAuthorWeightMap([]string{comment.MachineID}, weightCfg)[comment.MachineID]
-			c.JSON(200, gin.H{
-				"status":       "unliked",
-				"liked":        false,
-				"like_count":   comment.LikeCount,
-				"weight_score": computeCommentWeight(comment.LikeCount, replyCount, authorWeight, comment.WeightAdjustment),
-			})
-			return
-		}
 
-		// 未点赞 → 添加
-		like := NoticeCommentLike{
-			CommentID: req.CommentID,
-			MachineID: req.MachineID,
-		}
-		if err := db.Create(&like).Error; err != nil {
+			var existing NoticeCommentLike
+			err := tx.Where("comment_id = ? AND machine_id = ?", req.CommentID, req.MachineID).First(&existing).Error
+			if err == nil {
+				if err := tx.Delete(&existing).Error; err != nil {
+					return err
+				}
+				liked = false
+			} else if errors.Is(err, gorm.ErrRecordNotFound) {
+				if err := tx.Create(&NoticeCommentLike{
+					CommentID: req.CommentID,
+					MachineID: req.MachineID,
+				}).Error; err != nil {
+					return err
+				}
+				liked = true
+			} else {
+				return err
+			}
+
+			var likeCount int64
+			if err := tx.Model(&NoticeCommentLike{}).Where("comment_id = ?", req.CommentID).Count(&likeCount).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&NoticeComment{}).Where("id = ?", req.CommentID).Update("like_count", int(likeCount)).Error; err != nil {
+				return err
+			}
+			return tx.First(&comment, req.CommentID).Error
+		}); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(404, gin.H{"error": "评论不存在"})
+				return
+			}
 			c.JSON(500, gin.H{"error": "操作失败"})
 			return
 		}
-		db.Model(&comment).Update("like_count", gorm.Expr("like_count + 1"))
-		db.First(&comment, req.CommentID)
+
 		weightCfg := LoadCommentWeightConfig()
 		replyCount := 0
 		if comment.ParentID == 0 {
@@ -1138,8 +1146,7 @@ func initCommunityClientRoutes(r *gin.Engine) {
 		}
 		authorWeight := buildCommentAuthorWeightMap([]string{comment.MachineID}, weightCfg)[comment.MachineID]
 
-		// 向被点赞评论的作者推送互动通知（不向自己推送）
-		if comment.MachineID != req.MachineID {
+		if liked && comment.MachineID != req.MachineID {
 			likerNickname := ""
 			nm := buildNicknameMap([]string{req.MachineID})
 			if n, ok := nm[req.MachineID]; ok && n != "" {
@@ -1167,9 +1174,13 @@ func initCommunityClientRoutes(r *gin.Engine) {
 			go enqueueInteractionCommand(comment.MachineID, "like", notifData)
 		}
 
+		status := "unliked"
+		if liked {
+			status = "liked"
+		}
 		c.JSON(200, gin.H{
-			"status":       "liked",
-			"liked":        true,
+			"status":       status,
+			"liked":        liked,
 			"like_count":   comment.LikeCount,
 			"weight_score": computeCommentWeight(comment.LikeCount, replyCount, authorWeight, comment.WeightAdjustment),
 		})

@@ -60,7 +60,7 @@ const TaskLibrary = {
                 return;
             }
 
-            const res = await pywebview.api.get_tasks_list();
+            const res = await pywebview.api.get_tasks_list({ force_refresh: !!options.manual });
             if (!res || !res.valid) {
                 this._render_empty_state(list_el, count_el);
                 return;

@@ -457,11 +457,16 @@ class TelemetryManager:
         """
         心跳循环，间隔由服务端 heartbeat_interval 动态控制，默认 60 秒。
         """
-        self._stop_heartbeat = threading.Event()
+        if self._stop_heartbeat is not None and not self._stop_heartbeat.is_set():
+            self._telemetry_started = True
+            return
+
+        stop_event = threading.Event()
+        self._stop_heartbeat = stop_event
         self._telemetry_started = True
 
         def _loop():
-            while not self._stop_heartbeat.wait(self._heartbeat_interval):
+            while not stop_event.wait(self._heartbeat_interval):
                 try:
                     self.report_startup()
                 except Exception:

@@ -4998,10 +4998,11 @@ class AppApi:
 
     # ==================== 任务库 / 模型库 / 机库 卡片管理 API ====================
 
-    def get_tasks_list(self):
+    def get_tasks_list(self, opts=None):
         """扫描任务库目录，返回子文件夹列表供前端卡片展示。"""
         try:
-            items = self._task_mgr.scan_items()
+            force_refresh = bool(opts.get("force_refresh")) if isinstance(opts, dict) else False
+            items = self._task_mgr.scan_items(force_refresh=force_refresh)
             return {"valid": True, "items": items}
         except Exception as e:
             log.error(f"获取任务列表失败: {e}")
@@ -5029,10 +5030,11 @@ class AppApi:
             log.error(f"任务封面更新异常: {e}")
             return {"success": False, "msg": str(e)}
 
-    def get_models_list(self):
+    def get_models_list(self, opts=None):
         """扫描模型库目录，返回子文件夹列表供前端卡片展示。"""
         try:
-            items = self._model_mgr.scan_items()
+            force_refresh = bool(opts.get("force_refresh")) if isinstance(opts, dict) else False
+            items = self._model_mgr.scan_items(force_refresh=force_refresh)
             return {"valid": True, "items": items}
         except Exception as e:
             log.error(f"获取模型列表失败: {e}")
@@ -5060,10 +5062,11 @@ class AppApi:
             log.error(f"模型封面更新异常: {e}")
             return {"success": False, "msg": str(e)}
 
-    def get_hangar_list(self):
+    def get_hangar_list(self, opts=None):
         """扫描机库目录，返回子文件夹列表供前端卡片展示。"""
         try:
-            items = self._hangar_mgr.scan_items()
+            force_refresh = bool(opts.get("force_refresh")) if isinstance(opts, dict) else False
+            items = self._hangar_mgr.scan_items(force_refresh=force_refresh)
             return {"valid": True, "items": items}
         except Exception as e:
             log.error(f"获取机库列表失败: {e}")
