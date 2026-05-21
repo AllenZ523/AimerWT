@@ -1246,125 +1246,176 @@ const app = {
         pywebview.api.import_sights_zip_dialog();
     },
 
+    async uploadArchiveFileForImport(file, targetType) {
+        const api = window.pywebview?.api;
+        if (!api?.begin_browser_archive_import || !api?.append_browser_archive_chunk || !api?.finish_browser_archive_import) {
+            this.showAlert("错误", "拖入导入接口未就绪", "error");
+            return false;
+        }
+
+        const fileName = String(file?.name || "archive.zip");
+        const fileSize = Number(file?.size || 0);
+        const chunkSize = 256 * 1024;
+        let sessionId = "";
+
+        const readChunkAsBase64 = (blob) => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error("读取拖入文件失败"));
+            reader.onload = () => {
+                const text = String(reader.result || "");
+                const commaIndex = text.indexOf(",");
+                resolve(commaIndex >= 0 ? text.slice(commaIndex + 1) : text);
+            };
+            reader.readAsDataURL(blob);
+        });
+
+        try {
+            if (window.MinimalistLoading) {
+                MinimalistLoading.show(false, `正在接收: ${fileName}`);
+                MinimalistLoading.update(1, "正在准备拖入文件");
+            }
+
+            const beginRes = await api.begin_browser_archive_import(targetType, fileName, fileSize);
+            if (!beginRes || !beginRes.success || !beginRes.session_id) {
+                this.showAlert("错误", beginRes?.msg || "创建拖入导入任务失败", "error");
+                if (window.MinimalistLoading) MinimalistLoading.hide();
+                return false;
+            }
+            sessionId = beginRes.session_id;
+
+            let offset = 0;
+            let chunkIndex = 0;
+            while (offset < fileSize) {
+                const blob = file.slice(offset, Math.min(offset + chunkSize, fileSize));
+                const chunkBase64 = await readChunkAsBase64(blob);
+                const appendRes = await api.append_browser_archive_chunk(sessionId, chunkBase64);
+                if (!appendRes || !appendRes.success) {
+                    throw new Error(appendRes?.msg || "写入拖入文件失败");
+                }
+                offset += blob.size;
+                chunkIndex += 1;
+                if (window.MinimalistLoading) {
+                    const percent = Math.max(1, Math.min(95, Math.round((offset / Math.max(fileSize, 1)) * 95)));
+                    MinimalistLoading.update(percent, `正在接收: ${fileName}`);
+                }
+                if (chunkIndex % 8 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+            }
+
+            const finishRes = await api.finish_browser_archive_import(sessionId);
+            if (!finishRes || !finishRes.success) {
+                this.showAlert("错误", finishRes?.msg || "拖入导入失败", "error");
+                if (window.MinimalistLoading) MinimalistLoading.hide();
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error("uploadArchiveFileForImport failed", error);
+            if (sessionId && api?.cancel_browser_archive_import) {
+                try {
+                    await api.cancel_browser_archive_import(sessionId);
+                } catch (_) { }
+            }
+            if (window.MinimalistLoading) MinimalistLoading.hide();
+            this.showAlert("错误", error?.message || "拖入导入失败", "error");
+            return false;
+        }
+    },
+
     setupSkinsDropZone() {
-        const zone = document.getElementById('skins-drop-zone');
-        if (!zone) return;
-
-        const canHighlight = () => {
-            const activeId = (document.querySelector('.page.active') || {}).id || '';
-            return activeId === 'page-camo';
-        };
-
-        const onDragOver = (e) => {
-            if (!canHighlight()) return;
-            e.preventDefault();
-            e.stopPropagation();
-            zone.classList.add('drag-over');
-        };
-
-        const clear = () => zone.classList.remove('drag-over');
-
-        zone.addEventListener('dragenter', onDragOver);
-        zone.addEventListener('dragover', onDragOver);
-        zone.addEventListener('dragleave', clear);
-        zone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            clear();
-
-            if (!this.currentGamePath) {
-                this.showAlert("提示", "请先在主页设置游戏路径！", "warn");
-                this.switchTab('home');
-                return;
+        if (!window.ResourceDragOverlay) return;
+        ResourceDragOverlay.register({
+            resource_type: 'skins',
+            target_selector: '#view-skins .res-main',
+            icon: 'ri-upload-cloud-2-line',
+            title: '拖入涂装文件进行导入',
+            subtitle: '将 ZIP/RAR/7Z 压缩包放到此区域，AimerWT 会自动识别并导入到 UserSkins',
+            allowed_exts: ['.zip', '.rar', '.7z'],
+            invalid_message: '当前涂装库仅支持拖入 .zip/.rar/.7z 压缩包',
+            missing_path_message: '拖入通道未就绪，请稍后重试或使用“导入涂装文件”按钮',
+            backend_drop_fallback: false,
+            active_check: () => {
+                const activeId = (document.querySelector('.page.active') || {}).id || '';
+                const skinsView = document.getElementById('view-skins');
+                return activeId === 'page-camo' && !!(skinsView && skinsView.classList.contains('active'));
+            },
+            on_missing_path: async () => {
+                if (!this.currentGamePath) {
+                    this.showAlert("提示", "请先在主页设置游戏路径！", "warn");
+                    this.switchTab('home');
+                    return true;
+                }
+                return false;
+            },
+            on_file_drop: async (file) => {
+                if (!this.currentGamePath) {
+                    this.showAlert("提示", "请先在主页设置游戏路径！", "warn");
+                    this.switchTab('home');
+                    return;
+                }
+                await this.uploadArchiveFileForImport(file, 'skins');
+            },
+            on_drop: async (zipPath) => {
+                if (!this.currentGamePath) {
+                    this.showAlert("提示", "请先在主页设置游戏路径！", "warn");
+                    this.switchTab('home');
+                    return;
+                }
+                if (!window.pywebview?.api?.import_skin_zip_from_path) {
+                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    return;
+                }
+                pywebview.api.import_skin_zip_from_path(zipPath);
             }
-
-            const files = Array.from((e.dataTransfer && e.dataTransfer.files) ? e.dataTransfer.files : []);
-            const zipFile = files.find(f => String(f.path || f.name || '').toLowerCase().endsWith('.zip'));
-            if (!zipFile) {
-                this.showAlert("提示", "请拖入 .zip 压缩包", "warn");
-                return;
-            }
-
-            const zipPath = zipFile.path;
-            if (!zipPath) {
-                this.showAlert("提示", "当前环境无法获取拖入文件路径，请使用“选择 ZIP 解压”按钮", "warn");
-                return;
-            }
-
-            if (!window.pywebview?.api?.import_skin_zip_from_path) {
-                this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
-                return;
-            }
-
-            pywebview.api.import_skin_zip_from_path(zipPath);
         });
-
-        document.addEventListener('dragover', (e) => {
-            if (!canHighlight()) return;
-            e.preventDefault();
-        });
-        document.addEventListener('drop', (e) => {
-            if (!canHighlight()) return;
-            e.preventDefault();
-        });
+        ResourceDragOverlay.bind('skins');
     },
 
     setupSightsDropZone() {
-        const zone = document.getElementById('sights-drop-zone');
-        if (!zone) return;
-
-        const canHighlight = () => {
-            const activeId = (document.querySelector('.page.active') || {}).id || '';
-            const sightsView = document.getElementById('view-sights');
-            return activeId === 'page-camo' && !!(sightsView && sightsView.classList.contains('active'));
-        };
-
-        const onDragOver = (e) => {
-            if (!canHighlight()) return;
-            e.preventDefault();
-            e.stopPropagation();
-            zone.classList.add('drag-over');
-        };
-
-        const clear = () => zone.classList.remove('drag-over');
-
-        zone.addEventListener('dragenter', onDragOver);
-        zone.addEventListener('dragover', onDragOver);
-        zone.addEventListener('dragleave', clear);
-        zone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            clear();
-
-            const files = Array.from((e.dataTransfer && e.dataTransfer.files) ? e.dataTransfer.files : []);
-            const zipFile = files.find(f => String(f.path || f.name || '').toLowerCase().endsWith('.zip'));
-            if (!zipFile) {
-                this.showAlert("提示", "请拖入 .zip 压缩包", "warn");
-                return;
+        if (!window.ResourceDragOverlay) return;
+        ResourceDragOverlay.register({
+            resource_type: 'sights',
+            target_selector: '#view-sights .res-main',
+            icon: 'ri-crosshair-2-line',
+            title: '拖入炮镜文件进行导入',
+            subtitle: '将 ZIP/RAR/7Z 压缩包放到此区域，AimerWT 会自动识别并导入到 UserSights',
+            allowed_exts: ['.zip', '.rar', '.7z'],
+            invalid_message: '当前炮镜库仅支持拖入 .zip/.rar/.7z 压缩包',
+            missing_path_message: '拖入通道未就绪，请稍后重试或使用“导入炮镜文件”按钮',
+            backend_drop_fallback: false,
+            active_check: () => {
+                const activeId = (document.querySelector('.page.active') || {}).id || '';
+                const sightsView = document.getElementById('view-sights');
+                return activeId === 'page-camo' && !!(sightsView && sightsView.classList.contains('active'));
+            },
+            on_missing_path: async () => {
+                if (!this.sightsPath) {
+                    this.showAlert("提示", "请先设置 UserSights 路径！", "warn");
+                    return true;
+                }
+                return false;
+            },
+            on_file_drop: async (file) => {
+                if (!this.sightsPath) {
+                    this.showAlert("提示", "请先设置 UserSights 路径！", "warn");
+                    return;
+                }
+                await this.uploadArchiveFileForImport(file, 'sights');
+            },
+            on_drop: async (zipPath) => {
+                if (!this.sightsPath) {
+                    this.showAlert("提示", "请先设置 UserSights 路径！", "warn");
+                    return;
+                }
+                if (!window.pywebview?.api?.import_sights_zip_from_path) {
+                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    return;
+                }
+                pywebview.api.import_sights_zip_from_path(zipPath);
             }
-
-            const zipPath = zipFile.path;
-            if (!zipPath) {
-                this.showAlert("提示", "当前环境无法获取拖入文件路径，请使用“选择 ZIP 解压”按钮", "warn");
-                return;
-            }
-
-            if (!window.pywebview?.api?.import_sights_zip_from_path) {
-                this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
-                return;
-            }
-
-            pywebview.api.import_sights_zip_from_path(zipPath);
         });
-
-        document.addEventListener('dragover', (e) => {
-            if (!canHighlight()) return;
-            e.preventDefault();
-        });
-        document.addEventListener('drop', (e) => {
-            if (!canHighlight()) return;
-            e.preventDefault();
-        });
+        ResourceDragOverlay.bind('sights');
     },
 
     _formatBytes(bytes) {
@@ -4085,9 +4136,7 @@ app.init = async function () {
         const disclaimerAccepted = await app.checkDisclaimer();
         if (disclaimerAccepted === false) return;
 
-        // 1.2 全局拖放初始化（暂未启用）
-        // TODO: 当前拖放导入在部分压缩包场景下仍可能阻塞，需要完成专项优化后再恢复。
-        // if (app.setupGlobalDragDrop) app.setupGlobalDragDrop();
+        // 1.2 资源库拖放提示由 ResourceDragOverlay 负责。
         this.telemetryConnected = !!state.telemetry_connected;
         // AI 代理模式使用的遥测服务器基地址
         if (state.telemetry_base_url) window._telemetryBaseUrl = state.telemetry_base_url;
@@ -4111,6 +4160,12 @@ app.init = async function () {
         this.sightsPath = state.sights_path || null;
         this._sightsLoaded = false;
         this.loadSightsView();
+        if (typeof this.setupSkinsDropZone === 'function') {
+            this.setupSkinsDropZone();
+        }
+        if (typeof this.setupSightsDropZone === 'function') {
+            this.setupSightsDropZone();
+        }
 
         const themeBtn = document.getElementById('btn-theme');
         if (state.theme === 'Light') {

@@ -4,22 +4,23 @@
 
 功能定位:
 - 扫描游戏目录下的 UserSkins 文件夹，生成前端展示数据。
-- 支援从 ZIP 导入涂装，包含文件类型校验与磁盘空间检查。
+- 支援从 ZIP/RAR/7Z 导入涂装，包含文件类型校验与磁盘空间检查。
 - 提供涂装重命名与封面更新功能。
 
 输入输出:
-- 输入: 游戏路径、涂装 ZIP 路径、封面图片数据、重命名参数。
+- 输入: 游戏路径、涂装压缩包路径、封面图片数据、重命名参数。
 - 输出: 涂装列表字典、导入结果字典、对 UserSkins 目录结构的写入副作用。
 
 错误处理策略:
 - 文件操作使用具体的异常类型（PermissionError、FileNotFoundError 等）
-- ZIP 解压支援路径安全校验和文件类型白名单
+- 压缩包解压支援路径安全校验和文件类型白名单
 - 所有操作记录完整的错误上下文
 """
 import base64
 import os
 import re
 import shutil
+import subprocess
 import time
 import zipfile
 from pathlib import Path
@@ -53,6 +54,8 @@ class SkinsManager:
     属性:
         _cache: 扫描结果缓存
     """
+    supported_archive_extensions = (".zip", ".rar", ".7z")
+    allowed_skin_extensions = {".dds", ".blk", ".tga"}
     
     def __init__(self, cache_dir: str | Path | None = None):
         """
@@ -192,10 +195,10 @@ class SkinsManager:
         overwrite: bool = False,
     ) -> dict[str, Any]:
         """
-        将涂装 ZIP 解压导入到 UserSkins，并整理为目标目录结构。
+        将涂装压缩包解压导入到 UserSkins，并整理为目标目录结构。
         
         Args:
-            zip_path: ZIP 文件路径
+            zip_path: ZIP/RAR/7Z 文件路径
             game_path: 游戏安装路径
             progress_callback: 进度回调函数 (percentage, message)
             overwrite: 是否复盖同名文件夹
@@ -211,28 +214,29 @@ class SkinsManager:
         """
         zip_path = Path(zip_path)
         if not zip_path.exists():
-            raise ValueError(f"ZIP 文件不存在: {zip_path}")
-        if zip_path.suffix.lower() != ".zip":
-            raise ValueError("请选择有效的 .zip 文件")
+            raise ValueError(f"压缩包文件不存在: {zip_path}")
+        archive_ext = zip_path.suffix.lower()
+        if archive_ext not in self.supported_archive_extensions:
+            raise ValueError("请选择有效的 .zip/.rar/.7z 文件")
 
         # 仅允许导入涂装相关文件扩展名
-        ALLOWED_EXTENSIONS = {'.dds', '.blk', '.tga'}
         invalid_files = []
         
-        try:
-            with zipfile.ZipFile(zip_path, 'r') as zf:
-                for member in zf.infolist():
-                    if member.is_dir():
-                        continue
-                    filename = member.filename
-                    if '__MACOSX' in filename or 'desktop.ini' in filename.lower():
-                        continue
-                    
-                    ext = Path(filename).suffix.lower()
-                    if ext and ext not in ALLOWED_EXTENSIONS:
-                        invalid_files.append(filename)
-        except zipfile.BadZipFile as e:
-            raise ValueError(f"无效的 ZIP 文件: {e}")
+        if archive_ext == ".zip":
+            try:
+                with zipfile.ZipFile(zip_path, 'r') as zf:
+                    for member in zf.infolist():
+                        if member.is_dir():
+                            continue
+                        filename = member.filename
+                        if '__MACOSX' in filename or 'desktop.ini' in filename.lower():
+                            continue
+
+                        ext = Path(filename).suffix.lower()
+                        if ext and ext not in self.allowed_skin_extensions:
+                            invalid_files.append(filename)
+            except zipfile.BadZipFile as e:
+                raise ValueError(f"无效的 ZIP 文件: {e}")
         
         if invalid_files:
             file_list = '\n'.join(f'  • {f}' for f in invalid_files[:10])
@@ -287,11 +291,12 @@ class SkinsManager:
             if progress_callback:
                 progress_callback(1, f"准备解压到 UserSkins: {zip_path.name}")
 
-            self._extract_zip_safely(
+            self._extract_archive_safely(
                 zip_path, tmp_dir, 
                 progress_callback=progress_callback, 
                 base_progress=2, share_progress=85
             )
+            self._validate_extracted_skin_files(tmp_dir)
 
             top_level = [
                 p for p in tmp_dir.iterdir() 
@@ -555,6 +560,178 @@ class SkinsManager:
             raise
         except OSError as e:
             log.warning(f"磁盘空间检查失败（已跳过）: {e}")
+
+    def _find_7z(self) -> str | None:
+        return (
+            shutil.which("7z")
+            or shutil.which("7z.exe")
+            or shutil.which("7za")
+            or shutil.which("7za.exe")
+            or shutil.which("7zr")
+            or shutil.which("7zr.exe")
+        )
+
+    def _run_7z(self, args: list[str]) -> tuple[int, str]:
+        try:
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                errors="ignore",
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired as e:
+            stdout = e.stdout.decode("utf-8", "ignore") if isinstance(e.stdout, bytes) else (e.stdout or "")
+            stderr = e.stderr.decode("utf-8", "ignore") if isinstance(e.stderr, bytes) else (e.stderr or "")
+            output = stdout + "\n" + stderr
+            raise SkinsImportError(output.strip() or "7z 解压超时") from e
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        return result.returncode, output.strip()
+
+    def _is_archive_member_path_safe(self, filename: str) -> bool:
+        normalized = str(filename or "").replace("\\", "/").strip()
+        if not normalized:
+            return False
+        if re.match(r"^[a-zA-Z]:", normalized) or normalized.startswith("/"):
+            return False
+        parts = [part for part in normalized.split("/") if part]
+        return ".." not in parts
+
+    def _validate_7z_archive_entries(self, seven_zip: str, archive_path: Path) -> None:
+        code, output = self._run_7z([seven_zip, "l", "-slt", "-p", str(archive_path)])
+        if code != 0:
+            raise SkinsImportError(output or "无法读取压缩包目录")
+
+        in_entries = False
+        invalid_files: list[str] = []
+        unsafe_files: list[str] = []
+        for line in output.splitlines():
+            if line.startswith("----------"):
+                in_entries = True
+                continue
+            if not in_entries or not line.startswith("Path = "):
+                continue
+
+            filename = line[7:].strip()
+            if not filename or filename.endswith(("/", "\\")):
+                continue
+            if "__MACOSX" in filename or "desktop.ini" in filename.lower():
+                continue
+            if not self._is_archive_member_path_safe(filename):
+                unsafe_files.append(filename)
+                continue
+
+            ext = Path(filename).suffix.lower()
+            if ext and ext not in self.allowed_skin_extensions:
+                invalid_files.append(filename)
+
+        if unsafe_files:
+            file_list = "\n".join(f"  - {f}" for f in unsafe_files[:10])
+            raise SkinsImportError(f"压缩包路径不安全，已拒绝导入:\n{file_list}")
+        if invalid_files:
+            file_list = "\n".join(f"  • {f}" for f in invalid_files[:10])
+            if len(invalid_files) > 10:
+                file_list += f"\n  ... 还有 {len(invalid_files) - 10} 个文件"
+            raise ValueError(
+                f"❌ 检测到不允许的文件类型！\n\n"
+                f"涂装包只允许包含以下文件类型：\n"
+                f"  ✓ .dds (纹理文件)\n"
+                f"  ✓ .blk (配置文件)\n"
+                f"  ✓ .tga (纹理文件)\n\n"
+                f"但在压缩包中发现了以下非法文件：\n{file_list}\n\n"
+                f"💡 提示：请检查压缩包内容，确保只包含涂装相关文件。"
+            )
+
+    def _extract_with_7z(
+        self,
+        archive_path: Path,
+        target_dir: Path,
+        progress_callback: Callable[[int, str], None] | None = None,
+        base_progress: int = 0,
+        share_progress: int = 100,
+    ) -> None:
+        seven_zip = self._find_7z()
+        if not seven_zip:
+            raise SkinsImportError("未检测到 7z 解压组件，RAR/7Z 导入需要安装 7-Zip")
+
+        self._validate_7z_archive_entries(seven_zip, archive_path)
+        if progress_callback:
+            progress_callback(base_progress, f"开始解压: {archive_path.name}")
+
+        args = [
+            seven_zip,
+            "x",
+            "-y",
+            "-p",
+            f"-o{str(target_dir)}",
+            str(archive_path),
+        ]
+        code, output = self._run_7z(args)
+        if code != 0:
+            lower = output.lower()
+            if "password" in lower or "encrypted" in lower or "wrong password" in lower:
+                raise SkinsImportError("压缩包需要密码，当前涂装导入暂不支持加密压缩包")
+            raise SkinsImportError(output or "解压失败")
+
+        if progress_callback:
+            progress_callback(base_progress + share_progress, f"解压完成: {archive_path.name}")
+
+    def _extract_archive_safely(
+        self,
+        archive_path: Path,
+        target_dir: Path,
+        progress_callback: Callable[[int, str], None] | None = None,
+        base_progress: int = 0,
+        share_progress: int = 100,
+    ) -> None:
+        suffix = archive_path.suffix.lower()
+        if suffix == ".zip":
+            self._extract_zip_safely(
+                archive_path,
+                target_dir,
+                progress_callback=progress_callback,
+                base_progress=base_progress,
+                share_progress=share_progress,
+            )
+            return
+        if suffix in (".rar", ".7z"):
+            self._extract_with_7z(
+                archive_path,
+                target_dir,
+                progress_callback=progress_callback,
+                base_progress=base_progress,
+                share_progress=share_progress,
+            )
+            return
+        raise SkinsImportError(f"不支持的压缩格式: {archive_path.suffix}")
+
+    def _validate_extracted_skin_files(self, base_dir: Path) -> None:
+        invalid_files = []
+        for file_path in base_dir.rglob("*"):
+            if not file_path.is_file():
+                continue
+            rel_path = str(file_path.relative_to(base_dir))
+            if "__MACOSX" in rel_path or "desktop.ini" in rel_path.lower():
+                continue
+            ext = file_path.suffix.lower()
+            if ext and ext not in self.allowed_skin_extensions:
+                invalid_files.append(rel_path)
+
+        if not invalid_files:
+            return
+
+        file_list = "\n".join(f"  • {f}" for f in invalid_files[:10])
+        if len(invalid_files) > 10:
+            file_list += f"\n  ... 还有 {len(invalid_files) - 10} 个文件"
+        raise ValueError(
+            f"❌ 检测到不允许的文件类型！\n\n"
+            f"涂装包只允许包含以下文件类型：\n"
+            f"  ✓ .dds (纹理文件)\n"
+            f"  ✓ .blk (配置文件)\n"
+            f"  ✓ .tga (纹理文件)\n\n"
+            f"但在压缩包中发现了以下非法文件：\n{file_list}\n\n"
+            f"💡 提示：请检查压缩包内容，确保只包含涂装相关文件。"
+        )
 
     def _extract_zip_safely(
         self, 

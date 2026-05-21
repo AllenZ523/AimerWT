@@ -4,17 +4,17 @@
 
 功能定位:
 - 管理用户指定的 UserSights 目录，并扫描其中的炮镜文件夹以生成前端展示数据。
-- 将用户提供的炮镜 ZIP 解压导入到 UserSights，支援覆盖导入与进度回调。
+- 将用户提供的炮镜 ZIP/RAR/7Z 解压导入到 UserSights，支援覆盖导入与进度回调。
 - 提供炮镜文件夹重命名与封面（preview.png）更新能力。
 - 自动搜索 War Thunder 的 UserSights 路径，支援多 UID 选择。
 
 输入输出:
-- 输入: UserSights 路径、炮镜 ZIP 路径、封面 base64 数据、重命名参数、进度回调。
+- 输入: UserSights 路径、炮镜压缩包路径、封面 base64 数据、重命名参数、进度回调。
 - 输出: 炮镜列表字典、导入结果字典、对 UserSights 目录结构与 preview.png 的写入副作用。
 - 外部资源/依赖:
   - 目录: UserSights（读写）
   - 文件: 炮镜目录内的 .blk 文件（扫描计数）、preview.png（写入）
-  - 系统能力: zipfile 解压、文件系统读写、os.startfile
+  - 系统能力: zipfile/7z 解压、文件系统读写、os.startfile
 
 错误处理策略:
 - 文件操作使用具体的异常类型（PermissionError、FileNotFoundError 等）
@@ -58,6 +58,7 @@ class SightsManager:
         _usersights_path: 当前设置的 UserSights 路径
         _cache: 扫描结果缓存
     """
+    supported_archive_extensions = (".zip", ".rar", ".7z")
     
     def __init__(self, cache_dir: str | Path | None = None):
         """
@@ -561,6 +562,127 @@ class SightsManager:
             log.error(f"打开文件夹失败: {e}")
             return False
 
+    def _find_7z(self) -> str | None:
+        return (
+            shutil.which("7z")
+            or shutil.which("7z.exe")
+            or shutil.which("7za")
+            or shutil.which("7za.exe")
+            or shutil.which("7zr")
+            or shutil.which("7zr.exe")
+        )
+
+    def _run_7z(self, args: list[str]) -> tuple[int, str]:
+        try:
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                errors="ignore",
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired as e:
+            stdout = e.stdout.decode("utf-8", "ignore") if isinstance(e.stdout, bytes) else (e.stdout or "")
+            stderr = e.stderr.decode("utf-8", "ignore") if isinstance(e.stderr, bytes) else (e.stderr or "")
+            output = stdout + "\n" + stderr
+            raise SightsImportError(output.strip() or "7z 解压超时") from e
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        return result.returncode, output.strip()
+
+    def _is_archive_member_path_safe(self, filename: str) -> bool:
+        normalized = str(filename or "").replace("\\", "/").strip()
+        if not normalized:
+            return False
+        if normalized.startswith("/") or (len(normalized) > 1 and normalized[1] == ":"):
+            return False
+        parts = [part for part in normalized.split("/") if part]
+        return ".." not in parts
+
+    def _validate_7z_archive_entries(self, seven_zip: str, archive_path: Path, blocked_ext: set[str]) -> None:
+        code, output = self._run_7z([seven_zip, "l", "-slt", "-p", str(archive_path)])
+        if code != 0:
+            raise SightsImportError(output or "无法读取压缩包目录")
+
+        in_entries = False
+        unsafe_files: list[str] = []
+        blocked_files: list[str] = []
+        for line in output.splitlines():
+            if line.startswith("----------"):
+                in_entries = True
+                continue
+            if not in_entries or not line.startswith("Path = "):
+                continue
+
+            filename = line[7:].strip()
+            if not filename or filename.endswith(("/", "\\")):
+                continue
+            if "__MACOSX" in filename or "desktop.ini" in filename.lower():
+                continue
+            if not self._is_archive_member_path_safe(filename):
+                unsafe_files.append(filename)
+                continue
+
+            ext = Path(filename).suffix.lower()
+            if ext in blocked_ext:
+                blocked_files.append(filename)
+
+        if unsafe_files:
+            file_list = "\n".join(f"  - {f}" for f in unsafe_files[:10])
+            raise SightsImportError(f"压缩包路径不安全，已拒绝导入:\n{file_list}")
+        if blocked_files:
+            file_list = "\n".join(f"  - {f}" for f in blocked_files[:10])
+            raise SightsImportError(f"检测到不允许的文件类型:\n{file_list}")
+
+    def _extract_with_7z(
+        self,
+        archive_path: Path,
+        target_dir: Path,
+        blocked_ext: set[str],
+        progress_callback: Callable[[int, str], None] | None = None,
+        base_progress: int = 0,
+        share_progress: int = 100,
+    ) -> None:
+        seven_zip = self._find_7z()
+        if not seven_zip:
+            raise SightsImportError("未检测到 7z 解压组件，RAR/7Z 导入需要安装 7-Zip")
+
+        self._validate_7z_archive_entries(seven_zip, archive_path, blocked_ext)
+        if progress_callback:
+            progress_callback(base_progress, f"开始解压: {archive_path.name}")
+
+        args = [
+            seven_zip,
+            "x",
+            "-y",
+            "-p",
+            f"-o{str(target_dir)}",
+            str(archive_path),
+        ]
+        code, output = self._run_7z(args)
+        if code != 0:
+            lower = output.lower()
+            if "password" in lower or "encrypted" in lower or "wrong password" in lower:
+                raise SightsImportError("压缩包需要密码，当前炮镜导入暂不支持加密压缩包")
+            raise SightsImportError(output or "解压失败")
+
+        if progress_callback:
+            progress_callback(base_progress + share_progress, f"解压完成: {archive_path.name}")
+
+    def _validate_extracted_sights_files(self, base_dir: Path, blocked_ext: set[str]) -> None:
+        blocked_files = []
+        for file_path in base_dir.rglob("*"):
+            if not file_path.is_file():
+                continue
+            rel_path = str(file_path.relative_to(base_dir))
+            if "__MACOSX" in rel_path or "desktop.ini" in rel_path.lower():
+                continue
+            if file_path.suffix.lower() in blocked_ext:
+                blocked_files.append(rel_path)
+
+        if blocked_files:
+            file_list = "\n".join(f"  - {f}" for f in blocked_files[:10])
+            raise SightsImportError(f"检测到不允许的文件类型:\n{file_list}")
+
     def import_sights_zip(
         self,
         zip_path: str | Path,
@@ -568,10 +690,10 @@ class SightsManager:
         overwrite: bool = False,
     ) -> dict[str, Any]:
         """
-        将炮镜 ZIP 解压导入到 UserSights，并根据压缩包结构决定目标目录命名策略。
+        将炮镜压缩包解压导入到 UserSights，并根据压缩包结构决定目标目录命名策略。
         
         Args:
-            zip_path: ZIP 文件路径
+            zip_path: ZIP/RAR/7Z 文件路径
             progress_callback: 进度回调函数 (percentage, message)
             overwrite: 是否复盖同名文件夹
             
@@ -588,9 +710,10 @@ class SightsManager:
 
         zip_path = Path(zip_path)
         if not zip_path.exists():
-            raise ValueError(f"ZIP 文件不存在: {zip_path}")
-        if zip_path.suffix.lower() != ".zip":
-            raise ValueError("请选择有效的 .zip 文件")
+            raise ValueError(f"压缩包文件不存在: {zip_path}")
+        archive_ext = zip_path.suffix.lower()
+        if archive_ext not in self.supported_archive_extensions:
+            raise ValueError("请选择有效的 .zip/.rar/.7z 文件")
 
         usersights_dir = self._usersights_path
         try:
@@ -632,45 +755,56 @@ class SightsManager:
             if progress_callback:
                 progress_callback(1, f"准备解压到 UserSights: {zip_path.name}")
 
-            try:
-                with zipfile.ZipFile(zip_path, "r") as zf:
-                    members = [m for m in zf.infolist() if not m.is_dir()]
-                    total = max(len(members), 1)
-                    extracted = 0
+            if archive_ext == ".zip":
+                try:
+                    with zipfile.ZipFile(zip_path, "r") as zf:
+                        members = [m for m in zf.infolist() if not m.is_dir()]
+                        total = max(len(members), 1)
+                        extracted = 0
 
-                    for m in members:
-                        filename = m.filename
-                        if not filename or "__MACOSX" in filename or "desktop.ini" in filename.lower():
-                            continue
-                        if filename.endswith("/"):
-                            continue
+                        for m in members:
+                            filename = m.filename
+                            if not filename or "__MACOSX" in filename or "desktop.ini" in filename.lower():
+                                continue
+                            if filename.endswith("/"):
+                                continue
 
-                        ext = Path(filename).suffix.lower()
-                        if ext in blocked_ext:
-                            raise SightsImportError(f"检测到不允许的文件类型: {filename}")
+                            ext = Path(filename).suffix.lower()
+                            if ext in blocked_ext:
+                                raise SightsImportError(f"检测到不允许的文件类型: {filename}")
 
-                        target_path = tmp_dir / filename
-                        if not _is_within(tmp_dir, target_path):
-                            raise SightsImportError(f"压缩包路径不安全（路径遍历）: {filename}")
+                            target_path = tmp_dir / filename
+                            if not _is_within(tmp_dir, target_path):
+                                raise SightsImportError(f"压缩包路径不安全（路径遍历）: {filename}")
 
-                        try:
-                            target_path.parent.mkdir(parents=True, exist_ok=True)
-                            with zf.open(m, "r") as src, open(target_path, "wb") as dst:
-                                shutil.copyfileobj(src, dst, length=1024 * 1024)
-                        except PermissionError as e:
-                            raise SightsImportError(f"解压失败（权限不足）: {filename}: {e}")
-                        except OSError as e:
-                            raise SightsImportError(f"解压失败: {filename}: {e}")
+                            try:
+                                target_path.parent.mkdir(parents=True, exist_ok=True)
+                                with zf.open(m, "r") as src, open(target_path, "wb") as dst:
+                                    shutil.copyfileobj(src, dst, length=1024 * 1024)
+                            except PermissionError as e:
+                                raise SightsImportError(f"解压失败（权限不足）: {filename}: {e}")
+                            except OSError as e:
+                                raise SightsImportError(f"解压失败: {filename}: {e}")
 
-                        extracted += 1
-                        if progress_callback:
-                            pct = 2 + int((extracted / total) * 90)
-                            progress_callback(pct, f"解压中: {Path(filename).name}")
-                            
-            except zipfile.BadZipFile as e:
-                raise SightsImportError(f"无效的 ZIP 文件: {e}")
-            except zipfile.LargeZipFile as e:
-                raise SightsImportError(f"ZIP 文件过大: {e}")
+                            extracted += 1
+                            if progress_callback:
+                                pct = 2 + int((extracted / total) * 90)
+                                progress_callback(pct, f"解压中: {Path(filename).name}")
+
+                except zipfile.BadZipFile as e:
+                    raise SightsImportError(f"无效的 ZIP 文件: {e}")
+                except zipfile.LargeZipFile as e:
+                    raise SightsImportError(f"ZIP 文件过大: {e}")
+            else:
+                self._extract_with_7z(
+                    zip_path,
+                    tmp_dir,
+                    blocked_ext,
+                    progress_callback=progress_callback,
+                    base_progress=2,
+                    share_progress=90,
+                )
+            self._validate_extracted_sights_files(tmp_dir, blocked_ext)
 
             top_level = [
                 p

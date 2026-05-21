@@ -95,6 +95,65 @@ else:
 WEB_DIR = BASE_DIR / "web"
 
 log = get_logger(__name__)
+DIAGNOSTIC_TOOL_DIR = BASE_DIR / "OTHER" / "诊断工具"
+DIAGNOSTIC_LOG_PATH = DIAGNOSTIC_TOOL_DIR / "diagnostic_events.jsonl"
+_diagnostic_recorder = None
+_diagnostic_recorder_checked = False
+_diagnostic_logger_attached = False
+
+
+def _load_diagnostic_recorder():
+    tool_file = DIAGNOSTIC_TOOL_DIR / "diagnostic_recorder.py"
+    try:
+        if not tool_file.is_file():
+            return None
+    except OSError:
+        log.debug("诊断记录器路径不可用，已跳过加载", exc_info=True)
+        return None
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("aimerwt_diagnostic_recorder", tool_file)
+        if not spec or not spec.loader:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.create_recorder(DIAGNOSTIC_LOG_PATH, max_records=200)
+    except Exception:
+        log.debug("加载诊断记录器失败", exc_info=True)
+        return None
+
+
+def _get_diagnostic_recorder():
+    global _diagnostic_recorder, _diagnostic_recorder_checked
+    if not _diagnostic_recorder_checked:
+        _diagnostic_recorder_checked = True
+        _diagnostic_recorder = _load_diagnostic_recorder()
+    return _diagnostic_recorder
+
+
+def _attach_diagnostic_logger():
+    global _diagnostic_logger_attached
+    if _diagnostic_logger_attached:
+        return
+    recorder = _get_diagnostic_recorder()
+    if not recorder:
+        return
+    try:
+        recorder.attach_logger(setup_logger())
+        _diagnostic_logger_attached = True
+    except Exception:
+        log.debug("挂载诊断日志处理器失败", exc_info=True)
+
+
+def record_diagnostic_event(category, event, level="info", message="", **data):
+    recorder = _get_diagnostic_recorder()
+    if not recorder:
+        return
+    try:
+        recorder.record(category, event, level, message, **data)
+    except Exception:
+        pass
 
 
 class _ThemeUnlockFallbackService:
@@ -335,6 +394,8 @@ class AppApi:
         self._lock = threading.Lock()
 
         self._logger = setup_logger()
+        _attach_diagnostic_logger()
+        record_diagnostic_event("app", "api_init", "info", "AppApi 初始化")
         self._client_diagnostic_log_path = self._initialize_client_diagnostic_log()
 
         self._perf_enabled = bool(perf_enabled)
@@ -391,6 +452,8 @@ class AppApi:
         self._password_lock = threading.Lock()
         self._password_value = None
         self._password_cancelled = False
+        self._browser_import_lock = threading.Lock()
+        self._browser_import_sessions = {}
 
         # 遥测消息去重
         self._last_alert_content = None  # 紧急通知 (弹窗)
@@ -1659,6 +1722,198 @@ class AppApi:
         except Exception as e:
             self._logger.error(f"保存 AimerWT-Log 失败: {e}")
             return {"success": False, "message": str(e)}
+
+    def _browser_import_temp_dir(self) -> Path:
+        temp_dir = Path(tempfile.gettempdir()) / "AimerWT_drag_import"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        return temp_dir
+
+    def _cleanup_stale_browser_imports(self, max_age_seconds=86400):
+        temp_dir = self._browser_import_temp_dir()
+        now = time.time()
+        try:
+            for item in temp_dir.iterdir():
+                if not item.is_file():
+                    continue
+                try:
+                    if now - item.stat().st_mtime > max_age_seconds:
+                        item.unlink(missing_ok=True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def begin_browser_archive_import(self, target_type, file_name, file_size):
+        target = str(target_type or "").strip().lower()
+        if target not in {"skins", "sights"}:
+            return {"success": False, "msg": "拖入目标不支持"}
+
+        safe_name = Path(str(file_name or "archive.zip")).name
+        safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", safe_name).strip(" .")
+        if not safe_name:
+            safe_name = "archive.zip"
+        suffix = Path(safe_name).suffix.lower()
+        if suffix not in {".zip", ".rar", ".7z"}:
+            return {"success": False, "msg": "当前仅支持 .zip/.rar/.7z 压缩包"}
+
+        try:
+            size = int(file_size or 0)
+        except Exception:
+            size = 0
+        if size <= 0:
+            return {"success": False, "msg": "拖入文件为空"}
+
+        if self._is_busy:
+            return {"success": False, "msg": "另一个任务正在进行中，请稍候"}
+
+        self._cleanup_stale_browser_imports()
+        session_id = hashlib.sha1(f"{time.time()}:{random.random()}:{safe_name}".encode("utf-8")).hexdigest()
+        temp_path = self._browser_import_temp_dir() / safe_name
+        try:
+            temp_path.write_bytes(b"")
+        except Exception as e:
+            record_diagnostic_event("browser_import", "begin_failed", "error", "创建拖入临时文件失败", error=str(e))
+            return {"success": False, "msg": f"创建临时文件失败: {e}"}
+
+        with self._browser_import_lock:
+            self._browser_import_sessions[session_id] = {
+                "target": target,
+                "file_name": safe_name,
+                "expected_size": size,
+                "received_size": 0,
+                "chunk_count": 0,
+                "temp_path": str(temp_path),
+                "created_at": time.time(),
+            }
+
+        record_diagnostic_event(
+            "browser_import",
+            "begin",
+            "info",
+            "浏览器拖入分片接收开始",
+            target=target,
+            file_name=safe_name,
+            file_size=size,
+            temp_path=temp_path,
+        )
+        return {"success": True, "session_id": session_id}
+
+    def append_browser_archive_chunk(self, session_id, chunk_base64):
+        session_key = str(session_id or "")
+        with self._browser_import_lock:
+            session = self._browser_import_sessions.get(session_key)
+            if not session:
+                return {"success": False, "msg": "拖入导入任务不存在"}
+            temp_path = Path(session["temp_path"])
+
+        try:
+            chunk = base64.b64decode(str(chunk_base64 or "").encode("ascii"), validate=True)
+            if not chunk:
+                return {"success": False, "msg": "拖入文件分片为空"}
+            with temp_path.open("ab") as file:
+                file.write(chunk)
+            with self._browser_import_lock:
+                current = self._browser_import_sessions.get(session_key)
+                if current:
+                    current["received_size"] = int(current.get("received_size") or 0) + len(chunk)
+                    current["chunk_count"] = int(current.get("chunk_count") or 0) + 1
+                    received = current["received_size"]
+                else:
+                    received = 0
+            return {"success": True, "received_size": received}
+        except Exception as e:
+            record_diagnostic_event(
+                "browser_import",
+                "append_failed",
+                "error",
+                "写入拖入分片失败",
+                session_id=session_key,
+                error=str(e),
+            )
+            return {"success": False, "msg": f"写入分片失败: {e}"}
+
+    def finish_browser_archive_import(self, session_id):
+        session_key = str(session_id or "")
+        with self._browser_import_lock:
+            session = self._browser_import_sessions.pop(session_key, None)
+        if not session:
+            return {"success": False, "msg": "拖入导入任务不存在"}
+
+        temp_path = Path(session["temp_path"])
+        expected_size = int(session.get("expected_size") or 0)
+        received_size = int(session.get("received_size") or 0)
+        if expected_size and received_size != expected_size:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            record_diagnostic_event(
+                "browser_import",
+                "size_mismatch",
+                "error",
+                "拖入文件大小不一致",
+                expected_size=expected_size,
+                received_size=received_size,
+                temp_path=temp_path,
+            )
+            return {"success": False, "msg": "拖入文件接收不完整"}
+
+        target = str(session.get("target") or "")
+        record_diagnostic_event(
+            "browser_import",
+            "finish",
+            "info",
+            "浏览器拖入分片接收完成",
+            target=target,
+            file_name=session.get("file_name"),
+            received_size=received_size,
+            chunk_count=session.get("chunk_count"),
+            temp_path=temp_path,
+        )
+
+        if target == "skins":
+            started = self.import_skin_zip_from_path(str(temp_path))
+        elif target == "sights":
+            started = self.import_sights_zip_from_path(str(temp_path))
+        else:
+            started = False
+
+        if not started:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return {"success": False, "msg": "启动导入失败"}
+
+        def _delayed_cleanup(path):
+            time.sleep(3600)
+            try:
+                Path(path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        threading.Thread(target=_delayed_cleanup, args=(str(temp_path),), name="BrowserImportCleanup", daemon=True).start()
+        return {"success": True}
+
+    def cancel_browser_archive_import(self, session_id):
+        session_key = str(session_id or "")
+        with self._browser_import_lock:
+            session = self._browser_import_sessions.pop(session_key, None)
+        if session:
+            temp_path = Path(session.get("temp_path") or "")
+            try:
+                temp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            record_diagnostic_event(
+                "browser_import",
+                "cancel",
+                "info",
+                "浏览器拖入分片接收取消",
+                session_id=session_key,
+                temp_path=temp_path,
+            )
+        return {"success": True}
 
     def start_auto_search(self):
         # 在后台线程执行游戏目录自动搜索，并将结果写入配置后通知前端更新显示。
@@ -4380,7 +4635,7 @@ class AppApi:
             log.error(f"未设置有效游戏路径: {msg}")
             return False
 
-        file_types = ("Zip Files (*.zip)", "All files (*.*)")
+        file_types = ("Archive Files (*.zip;*.rar;*.7z)", "All files (*.*)")
         result = self._window.create_file_dialog(
             webview.FileDialog.OPEN, allow_multiple=False, file_types=file_types
         )
@@ -5107,7 +5362,7 @@ class AppApi:
             log.warning("请先设置有效的 UserSights 路径")
             return False
 
-        file_types = ("Zip Files (*.zip)", "All files (*.*)")
+        file_types = ("Archive Files (*.zip;*.rar;*.7z)", "All files (*.*)")
         result = self._window.create_file_dialog(
             webview.FileDialog.OPEN, allow_multiple=False, file_types=file_types
         )
@@ -5598,91 +5853,213 @@ def main() -> int:
     # 绑定窗口对象到桥接层
     api.set_window(window)
 
-    # TODO: 当前拖放导入在部分压缩包场景下仍可能阻塞，需要单独治理后再启用。
     def _bind_drag_drop(win):
         # 绑定拖拽投放事件，用于在特定页面接收文件拖入并触发导入流程。
         try:
             from webview.dom import DOMEventHandler
         except Exception:
             log.debug("DOMEventHandler 不可用，略过拖放绑定")
+            record_diagnostic_event("drag_drop", "dom_handler_unavailable", "warning", "DOMEventHandler 不可用")
             return
 
-        def on_drop(e):
-            def _async_processor():
-                try:
-                    win.evaluate_js("if(window.app && app.hideDropOverlay) app.hideDropOverlay()")
+        def _extract_drop_paths(e):
+            try:
+                data_tx = e.get("dataTransfer") if isinstance(e, dict) else {}
+                files = data_tx.get("files") if isinstance(data_tx, dict) else []
+            except Exception:
+                files = []
 
-                    try:
-                        active_page = win.evaluate_js("(document.querySelector('.page.active')||{}).id || ''")
-                    except Exception:
-                        active_page = ""
+            full_paths = []
+            for file_info in files:
+                if not isinstance(file_info, dict):
+                    continue
+                raw_path = (
+                    file_info.get("pywebviewFullPath")
+                    or file_info.get("path")
+                    or file_info.get("_path")
+                )
+                if raw_path:
+                    full_paths.append(str(raw_path))
+            return files, full_paths
+
+        def _read_drop_context():
+            context = {"active_page": "", "resource_view": "skins", "handled_at": 0}
+            try:
+                raw = win.evaluate_js(
+                    """
+                    (function(){
+                        var activeEl = document.querySelector('.page.active') || {};
+                        var navEl = document.querySelector('#page-camo .resource-nav-item.active');
+                        var resourceView = (navEl && navEl.dataset) ? (navEl.dataset.target || 'skins') : 'skins';
+                        return JSON.stringify({
+                            active_page: activeEl.id || '',
+                            resource_view: resourceView,
+                            handled_at: Number(window.__resource_drag_drop_handled_at || 0)
+                        });
+                    })()
+                    """
+                )
+                if isinstance(raw, str):
+                    parsed = json.loads(raw)
+                elif isinstance(raw, dict):
+                    parsed = raw
+                else:
+                    parsed = {}
+                if isinstance(parsed, dict):
+                    context.update(parsed)
+            except Exception as ex:
+                record_diagnostic_event(
+                    "drag_drop",
+                    "context_read_failed",
+                    "warning",
+                    "读取拖入页面状态失败",
+                    error=str(ex),
+                )
+            return context
+
+        def _show_backend_drop_warning(message):
+            try:
+                msg_js = json.dumps(str(message), ensure_ascii=False)
+                win.evaluate_js(
+                    f"if(window.app && app.showAlert) app.showAlert('提示', {msg_js}, 'warn')"
+                )
+            except Exception:
+                pass
+
+        def _import_drag_archive(active_page, resource_view, archive_path):
+            if active_page == "page-lib":
+                api.import_voice_zip_from_path(archive_path)
+                return "voice"
+            if active_page == "page-camo":
+                if resource_view == "sights":
+                    api.import_sights_zip_from_path(archive_path)
+                    return "sights"
+                api.import_skin_zip_from_path(archive_path)
+                return "skins"
+            if active_page == "page-sight":
+                api.import_sights_zip_from_path(archive_path)
+                return "sights"
+            return ""
+
+        def on_drop(e):
+            received_perf = time.perf_counter()
+            files, full_paths = _extract_drop_paths(e)
+            record_diagnostic_event(
+                "drag_drop",
+                "drop_received",
+                "info",
+                "收到拖入事件",
+                file_count=len(files),
+                path_count=len(full_paths),
+                elapsed_ms=round((time.perf_counter() - received_perf) * 1000, 2),
+            )
+
+            if not full_paths:
+                record_diagnostic_event(
+                    "drag_drop",
+                    "path_missing",
+                    "warning",
+                    "后端拖入事件未返回文件路径",
+                    file_count=len(files),
+                )
+                threading.Thread(
+                    target=_show_backend_drop_warning,
+                    args=("当前环境未能读取拖入文件路径，请使用导入按钮。",),
+                    name="DragDropMissingPathNotice",
+                    daemon=True,
+                ).start()
+                return
+
+            def _async_processor(paths):
+                try:
+                    context = _read_drop_context()
+                    handled_at = float(context.get("handled_at") or 0)
+                    if handled_at and (time.time() * 1000 - handled_at) < 1500:
+                        record_diagnostic_event(
+                            "drag_drop",
+                            "skip_frontend_handled",
+                            "info",
+                            "前端已处理拖入事件",
+                        )
+                        return
+
+                    active_page = str(context.get("active_page") or "")
+                    resource_view = str(context.get("resource_view") or "skins")
 
                     allowed_pages = ["page-home", "page-lib", "page-camo", "page-sight"]
                     if not active_page or active_page not in allowed_pages:
+                        record_diagnostic_event(
+                            "drag_drop",
+                            "skip_inactive_page",
+                            "info",
+                            "当前页面不处理拖入文件",
+                            active_page=active_page,
+                        )
                         return
 
                     if active_page == "page-home":
-                        win.evaluate_js("app.switchTab('lib')")
                         active_page = "page-lib"
 
-                    # 提取文件路径
-                    try:
-                        data_tx = e.get("dataTransfer") or {}
-                        files = data_tx.get("files") or []
-                    except Exception:
-                        files = []
-
-                    full_paths = []
-                    for f in files:
-                        p = f.get("pywebviewFullPath")
-                        if p:
-                            full_paths.append(str(p))
-
-                    if not full_paths:
+                    voice_archive_exts = (".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tgz", ".tbz2", ".bank")
+                    resource_archive_exts = (".zip", ".rar", ".7z")
+                    archive_exts = voice_archive_exts if active_page == "page-lib" else resource_archive_exts
+                    archive_files = [p for p in paths if p.lower().endswith(archive_exts)]
+                    if not archive_files:
+                        record_diagnostic_event(
+                            "drag_drop",
+                            "unsupported_file",
+                            "warning",
+                            "拖入文件格式不在当前页面允许列表内",
+                            active_page=active_page,
+                            resource_view=resource_view,
+                            paths=paths,
+                        )
                         return
 
-                    archive_exts = (".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tgz", ".tbz2", ".bank")
-                    zip_files = [p for p in full_paths if p.lower().endswith(archive_exts)]
-                    if not zip_files:
-                        return
-
-                    zp = zip_files[0]
-
-                    if active_page == "page-lib":
-                        api.import_voice_zip_from_path(zp)
-                    elif active_page == "page-camo":
-                        try:
-                            res_view = win.evaluate_js(
-                                "(document.querySelector('#page-camo .resource-nav-item.active')||{}).dataset.target || 'skins'"
-                            )
-                        except Exception:
-                            res_view = "skins"
-
-                        if res_view == "sights":
-                            api.import_sights_zip_from_path(zp)
-                        else:
-                            api.import_skin_zip_from_path(zp)
-                    elif active_page == "page-sight":
-                        api.import_sights_zip_from_path(zp)
+                    archive_path = archive_files[0]
+                    target_type = _import_drag_archive(active_page, resource_view, archive_path)
+                    record_diagnostic_event(
+                        "drag_drop",
+                        "import_dispatched",
+                        "info",
+                        "拖入文件已交给导入流程",
+                        active_page=active_page,
+                        resource_view=resource_view,
+                        target_type=target_type,
+                        archive_path=archive_path,
+                    )
 
                 except Exception as ex:
+                    record_diagnostic_event(
+                        "drag_drop",
+                        "drop_process_failed",
+                        "error",
+                        "拖拽处理发生异常",
+                        error=str(ex),
+                    )
                     log.error(f"拖拽处理发生异常: {ex}", exc_info=True)
 
-            threading.Thread(target=_async_processor, daemon=True).start()
+            threading.Thread(
+                target=_async_processor,
+                args=(full_paths,),
+                name="DragDropImportDispatch",
+                daemon=True,
+            ).start()
 
         try:
             win.dom.document.events.drop += DOMEventHandler(on_drop, True, False)
         except Exception:
             log.debug("绑定拖放事件失败", exc_info=True)
+            record_diagnostic_event("drag_drop", "bind_failed", "warning", "绑定拖放事件失败")
             return
+        try:
+            win.evaluate_js("window.__resource_backend_drop_ready = true")
+            record_diagnostic_event("drag_drop", "backend_ready", "info", "后端拖入兜底已就绪")
+        except Exception:
+            log.debug("标记拖放后端状态失败", exc_info=True)
+            record_diagnostic_event("drag_drop", "ready_mark_failed", "warning", "标记拖放后端状态失败")
 
     def _on_start(win):
-        # TODO 需要优化，拖放压缩包时大概率卡死
-        # try:
-        #     _bind_drag_drop(win)
-        # except Exception:
-        #     log.exception("_bind_drag_drop 失败")
-
         # 部分 GUI 后端可能忽略 create_window 的 x/y；启动后补一次置中
         try:
             if start_x is not None and start_y is not None and hasattr(win, "move"):
