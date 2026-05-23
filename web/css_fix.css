@@ -865,6 +865,12 @@
     pointer-events: auto;
 }
 
+/* 公告滚动提示层只做视觉提示，不能拦截往期动态 hover/click。 */
+.page.active .notice-history-arrow-up,
+.page.active .notice-history-arrow-down {
+    pointer-events: none !important;
+}
+
 /* ========================
    路径设置卡片样式
    ======================== */

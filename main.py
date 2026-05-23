@@ -704,13 +704,26 @@ class AppApi:
 
     def _extract_user_feature_flags(self, config=None) -> dict:
         defaults = {
-            "badge_system_enabled": True,
-            "nickname_change_enabled": True,
-            "avatar_upload_enabled": True,
-            "notice_comment_enabled": True,
-            "notice_reaction_enabled": True,
+            "badge_system_enabled": False,
+            "nickname_change_enabled": False,
+            "avatar_upload_enabled": False,
+            "notice_comment_enabled": False,
+            "notice_reaction_enabled": False,
             "redeem_code_enabled": True,
             "feedback_enabled": True,
+            "user_profile_enabled": False,
+            "ai_assistant_enabled": False,
+            "notification_center_enabled": False,
+        }
+        basic_release_locks = {
+            "badge_system_enabled": False,
+            "nickname_change_enabled": False,
+            "avatar_upload_enabled": False,
+            "notice_comment_enabled": False,
+            "notice_reaction_enabled": False,
+            "user_profile_enabled": False,
+            "ai_assistant_enabled": False,
+            "notification_center_enabled": False,
         }
         if not isinstance(config, dict):
             return defaults
@@ -719,6 +732,7 @@ class AppApi:
         for key in list(defaults.keys()):
             if key in config:
                 result[key] = bool(config.get(key))
+        result.update(basic_release_locks)
         return result
 
     def _apply_server_message(self, config: dict, force: bool = False):

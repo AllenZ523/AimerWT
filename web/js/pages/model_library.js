@@ -24,6 +24,8 @@ const ModelLibrary = {
     _items: [],
     _search_query: '',
     _sort_key: 'update_time',
+    _filter_status: 'all',
+    _sort_asc: false,
     _render_seq: 0,
     _refreshing: false,
     _current_edit_name: null,
@@ -169,9 +171,31 @@ const ModelLibrary = {
         this._render_filtered_list();
     },
 
+    filter_status(value) {
+        this._filter_status = value || 'all';
+        this._render_filtered_list();
+    },
+
+    toggle_sort_order() {
+        this._sort_asc = !this._sort_asc;
+        const btn = document.getElementById('models-sort-order-btn');
+        if (btn) btn.classList.toggle('is-asc', this._sort_asc);
+        this._render_filtered_list();
+    },
+
     _get_visible_items() {
         const query = String(this._search_query || '').trim().toLowerCase();
         let items = Array.isArray(this._items) ? this._items.slice() : [];
+
+        /* 状态筛选 */
+        const filter_status = this._filter_status || 'all';
+        if (filter_status !== 'all') {
+            items = items.filter(it => {
+                const name = String(it.name || '');
+                const is_disabled = !!it.disabled || name.endsWith('.AimerWT_BAN');
+                return filter_status === 'disabled' ? is_disabled : !is_disabled;
+            });
+        }
 
         if (query) {
             items = items.filter(it => {
@@ -189,18 +213,21 @@ const ModelLibrary = {
         }
 
         const sort_key = this._sort_key || 'update_time';
+        const asc = !!this._sort_asc;
         items.sort((a, b) => {
+            let cmp = 0;
             if (sort_key === 'name') {
                 const a_name = String(a.display_name || a.name || '');
                 const b_name = String(b.display_name || b.name || '');
-                return a_name.localeCompare(b_name, 'zh-CN', { numeric: true });
+                cmp = a_name.localeCompare(b_name, 'zh-CN', { numeric: true });
+            } else if (sort_key === 'size') {
+                cmp = Number(b.size_bytes || 0) - Number(a.size_bytes || 0);
+            } else {
+                const b_time = Number(b.mtime || 0) || (b.date ? new Date(b.date).getTime() : 0);
+                const a_time = Number(a.mtime || 0) || (a.date ? new Date(a.date).getTime() : 0);
+                cmp = b_time - a_time;
             }
-            if (sort_key === 'size') {
-                return Number(b.size_bytes || 0) - Number(a.size_bytes || 0);
-            }
-            const b_time = Number(b.update_time || b.mtime || b.modified_time || 0);
-            const a_time = Number(a.update_time || a.mtime || a.modified_time || 0);
-            return b_time - a_time;
+            return asc ? -cmp : cmp;
         });
 
         return items;

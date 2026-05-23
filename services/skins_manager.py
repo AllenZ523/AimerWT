@@ -121,6 +121,7 @@ class SkinsManager:
             entries = sorted([e for e in userskins_dir.iterdir() if e.is_dir()], key=lambda p: p.name.lower())
             
             for entry in entries:
+                entry_mtime = entry.stat().st_mtime
                 preview_path = self._find_preview_image(entry)
                 cover_path = preview_path
                 if not cover_path and default_cover_path and default_cover_path.exists():
@@ -154,6 +155,7 @@ class SkinsManager:
                         "preview_path": str(preview_path) if preview_path else "",
                         "cover_url": cover_url,
                         "cover_is_default": cover_is_default,
+                        "mtime": entry_mtime,
                     }
                 else:
                     item["name"] = entry.name
@@ -161,6 +163,7 @@ class SkinsManager:
                     item["disabled"] = is_disabled
                     item["path"] = str(entry)
                     item["preview_path"] = str(preview_path) if preview_path else ""
+                    item["mtime"] = entry_mtime
 
                 items.append(item)
                 if not skip_covers:

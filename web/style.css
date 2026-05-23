@@ -507,6 +507,7 @@ i[class^="ri-"] {
 .notice-content:hover::-webkit-scrollbar-thumb,
 .log-container:hover::-webkit-scrollbar-thumb,
 .lib-scroll-area:hover::-webkit-scrollbar-thumb,
+.res-body:hover .res-main::-webkit-scrollbar-thumb,
 .page:hover::-webkit-scrollbar-thumb {
     background-color: var(--scrollbar-track-hover);
 }
@@ -1332,7 +1333,6 @@ i[class^="ri-"] {
 }
 
 .notice-card:hover {
-    transform: translateY(-2px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 

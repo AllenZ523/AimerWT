@@ -16,12 +16,26 @@ const AIManager = {
     
     // 初始化状态
     initialized: false,
+
+    isEnabled() {
+        if (window.app && typeof window.app.getServerUserFeatures === 'function') {
+            return window.app.getServerUserFeatures('ai_assistant_enabled');
+        }
+        if (window._aimerUserFeatures &&
+            Object.prototype.hasOwnProperty.call(window._aimerUserFeatures, 'ai_assistant_enabled')) {
+            return window._aimerUserFeatures.ai_assistant_enabled !== false;
+        }
+        return false;
+    },
     
     /**
      * 初始化AI助手
      * 应在DOM加载完成后调用
      */
     init() {
+        if (!this.isEnabled()) {
+            return;
+        }
         if (this.initialized) {
             console.log('[AI] 已经初始化');
             return;
@@ -59,7 +73,7 @@ const AIManager = {
      * 打开AI聊天框
      */
     openChat() {
-        if (AIChat) {
+        if (this.isEnabled() && AIChat) {
             AIChat.open();
         }
     },
@@ -68,7 +82,7 @@ const AIManager = {
      * 关闭AI聊天框
      */
     closeChat() {
-        if (AIChat) {
+        if (this.isEnabled() && AIChat) {
             AIChat.close();
         }
     },
@@ -77,7 +91,7 @@ const AIManager = {
      * 切换AI聊天框
      */
     toggleChat() {
-        if (AIChat) {
+        if (this.isEnabled() && AIChat) {
             AIChat.toggle();
         }
     },

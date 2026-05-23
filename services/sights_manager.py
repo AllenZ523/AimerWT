@@ -358,6 +358,7 @@ class SightsManager:
                 if not item.is_dir():
                     continue
 
+                item_mtime = item.stat().st_mtime
                 preview_path = self._find_preview_image(item)
                 cover_path = preview_path
                 if not cover_path and default_cover_path and default_cover_path.exists():
@@ -392,12 +393,14 @@ class SightsManager:
                         'file_count': len(blk_files),
                         'cover_url': cover_url,
                         'cover_is_default': cover_is_default,
+                        'mtime': item_mtime,
                     }
                 else:
                     sight['name'] = item.name
                     sight['path'] = str(item)
                     sight['disabled'] = item.name.endswith(self.disabled_suffix)
                     sight['enabled_name'] = item.name[:-len(self.disabled_suffix)] if item.name.endswith(self.disabled_suffix) else item.name
+                    sight['mtime'] = item_mtime
 
                 sights.append(sight)
                 next_records[item.name] = self._index_cache.make_record(signature, sight)

@@ -106,15 +106,13 @@ class CoreService:
         # 只在第一次或游戏路径改变时重新初始化
         try:
             if self.manifest_mgr is None or self.manifest_mgr.game_root != self.game_root:
-                log.info(f"[MANIFEST] 创建新的 ManifestManager 实例")
                 self.manifest_mgr = ManifestManager(self.game_root)
-                log.info("已初始化清单管理器")
+                log.info(f"[MANIFEST] 清单管理器已初始化: {self.game_root}")
             else:
-                log.info(f"[MANIFEST] 重新加载清单数据（游戏路径未变）")
                 # 重新加载清单以获取最新数据
                 self.manifest_mgr.manifest = self.manifest_mgr._load_manifest()
-                log.info("已重新加载清单数据")
-            log.info(f"游戏路径校验成功: {path}")
+                log.debug(f"[MANIFEST] 已刷新清单数据: {self.game_root}")
+            log.debug(f"游戏路径校验通过: {path}")
         except Exception as e:
             log.error(f"初始化清单管理器失败: {e}")
             # 清单管理器失败不阻止继续操作

@@ -195,18 +195,38 @@ const app = {
 
     getDefaultUserFeatures() {
         return {
-            badge_system_enabled: true,
-            nickname_change_enabled: true,
-            avatar_upload_enabled: true,
-            notice_comment_enabled: true,
-            notice_reaction_enabled: true,
+            badge_system_enabled: false,
+            nickname_change_enabled: false,
+            avatar_upload_enabled: false,
+            notice_comment_enabled: false,
+            notice_reaction_enabled: false,
             redeem_code_enabled: true,
             feedback_enabled: true,
+            user_profile_enabled: false,
+            ai_assistant_enabled: false,
+            notification_center_enabled: false,
+        };
+    },
+
+    getBasicServerReleaseFeatureLocks() {
+        return {
+            badge_system_enabled: false,
+            nickname_change_enabled: false,
+            avatar_upload_enabled: false,
+            notice_comment_enabled: false,
+            notice_reaction_enabled: false,
+            user_profile_enabled: false,
+            ai_assistant_enabled: false,
+            notification_center_enabled: false,
         };
     },
 
     normalizeServerUserFeatures(raw = {}) {
-        return { ...this.getDefaultUserFeatures(), ...(raw || {}) };
+        return {
+            ...this.getDefaultUserFeatures(),
+            ...(raw || {}),
+            ...this.getBasicServerReleaseFeatureLocks(),
+        };
     },
 
     getServerUserFeatures(key) {
@@ -309,8 +329,8 @@ const app = {
         const visibility = {
             'cdk-redeem-card': online && features.redeem_code_enabled !== false,
             'feedback-card': online && features.feedback_enabled !== false,
-            'user-profile-card': online,
-            'btn-notification-bell': online,
+            'user-profile-card': online && features.user_profile_enabled !== false,
+            'btn-notification-bell': online && features.notification_center_enabled !== false,
         };
         Object.entries(visibility).forEach(([id, visible]) => {
             const el = document.getElementById(id);
@@ -325,9 +345,10 @@ const app = {
                     <p>${this.t('online.unavailable_desc')}</p>
                 </div>`;
         }
-        if (!online && window.userProfile && typeof window.userProfile.stopForCurrentLanguage === 'function') {
+        const profileEnabled = online && features.user_profile_enabled !== false;
+        if (!profileEnabled && window.userProfile && typeof window.userProfile.stopForCurrentLanguage === 'function') {
             window.userProfile.stopForCurrentLanguage();
-        } else if (online && window._telemetryHWID && window.userProfile && typeof window.userProfile.loadProfile === 'function') {
+        } else if (profileEnabled && window._telemetryHWID && window.userProfile && typeof window.userProfile.loadProfile === 'function') {
             window.userProfile.loadProfile();
         }
     },
@@ -344,9 +365,14 @@ const app = {
         if (feedbackCard) feedbackCard.style.display = features.feedback_enabled ? '' : 'none';
 
         const openNoticeShell = document.getElementById('notice-detail-shell');
-        if (openNoticeShell && !features.notice_comment_enabled) {
-            openNoticeShell.querySelectorAll('.nc-panel').forEach(el => el.remove());
-            openNoticeShell.querySelectorAll('.nc-split-layout').forEach(el => el.classList.remove('nc-split-layout'));
+        if (openNoticeShell) {
+            if (!features.notice_comment_enabled) {
+                openNoticeShell.querySelectorAll('.nc-panel').forEach(el => el.remove());
+                openNoticeShell.querySelectorAll('.nc-split-layout').forEach(el => el.classList.remove('nc-split-layout'));
+            }
+            if (!features.notice_reaction_enabled) {
+                openNoticeShell.querySelectorAll('.notice-reaction-inline').forEach(el => el.remove());
+            }
         }
 
         if (window.userProfile && typeof window.userProfile.applyFeatureSettings === 'function') {
@@ -595,9 +621,32 @@ const app = {
         this._renderSkinsView();
     },
 
+    filterSkinsStatus(value) {
+        this._skinsFilterStatus = value || 'all';
+        if (this._skinsRefreshing && !this._skinsLoaded) return;
+        this._renderSkinsView();
+    },
+
+    toggleSkinsSortOrder() {
+        this._skinsSortAsc = !this._skinsSortAsc;
+        const btn = document.getElementById('skins-sort-order-btn');
+        if (btn) btn.classList.toggle('is-asc', this._skinsSortAsc);
+        this._renderSkinsView();
+    },
+
     _getFilteredSkins() {
         const query = String(this._skinsSearchQuery || "").trim().toLowerCase();
         let items = Array.isArray(this._skinsItems) ? this._skinsItems.slice() : [];
+
+        /* 状态筛选 */
+        const filterStatus = this._skinsFilterStatus || 'all';
+        if (filterStatus !== 'all') {
+            items = items.filter(it => {
+                const name = String(it.name || '');
+                const isDisabled = !!it.disabled || name.endsWith('.AimerWT_BAN');
+                return filterStatus === 'disabled' ? isDisabled : !isDisabled;
+            });
+        }
 
         if (query) {
             items = items.filter(it => {
@@ -614,18 +663,21 @@ const app = {
         }
 
         const sortKey = this._skinsSortKey || "update_time";
+        const asc = !!this._skinsSortAsc;
         items.sort((a, b) => {
+            let cmp = 0;
             if (sortKey === "name") {
                 const aName = String(a.display_name || a.name || "");
                 const bName = String(b.display_name || b.name || "");
-                return aName.localeCompare(bName, "zh-CN", { numeric: true });
+                cmp = aName.localeCompare(bName, "zh-CN", { numeric: true });
+            } else if (sortKey === "size") {
+                cmp = Number(b.size_bytes || 0) - Number(a.size_bytes || 0);
+            } else {
+                const bTime = Number(b.mtime || b.update_time || 0);
+                const aTime = Number(a.mtime || a.update_time || 0);
+                cmp = bTime - aTime;
             }
-            if (sortKey === "size") {
-                return Number(b.size_bytes || 0) - Number(a.size_bytes || 0);
-            }
-            const bTime = Number(b.update_time || b.mtime || b.modified_time || 0);
-            const aTime = Number(a.update_time || a.mtime || a.modified_time || 0);
-            return bTime - aTime;
+            return asc ? -cmp : cmp;
         });
 
         return items;
@@ -1611,7 +1663,14 @@ const app = {
         const type = String(resourceType || '').trim();
         if (!type) return;
 
-        this._setResourceStorageState(type, 'loading');
+        /* 如果当前已有有效数据，跳过 loading 状态，静默刷新 */
+        const totalEl = document.getElementById(`${type}-storage-total`);
+        const cur = totalEl ? totalEl.textContent.trim() : '';
+        const isFirstLoad = !cur || cur === '未获取' || cur === '读取中...';
+        if (isFirstLoad) {
+            this._setResourceStorageState(type, 'loading');
+        }
+
         try {
             if (!window.pywebview?.api?.get_resource_storage_info) {
                 this._setResourceStorageState(type, 'unavailable', { reason: 'api_unavailable' });
@@ -2357,7 +2416,8 @@ const app = {
                 if (st && st.telemetry_base_url) window._telemetryBaseUrl = st.telemetry_base_url;
                 if (st && st.hwid) window._telemetryHWID = st.hwid;
             }
-            if (connected && wasDisconnected && window.userProfile && typeof window.userProfile.loadProfile === 'function') {
+            if (connected && wasDisconnected && this.getServerUserFeatures('user_profile_enabled') &&
+                window.userProfile && typeof window.userProfile.loadProfile === 'function') {
                 window.userProfile.loadProfile();
             }
             if (window.NoticeBoardModule && typeof window.NoticeBoardModule.updateServerStatusFooter === 'function') {
@@ -4642,6 +4702,44 @@ app.initResourceSortDropdowns = function () {
         dropdown.setValue(select_el.value || options[0]?.value || '', false);
         this.resource_sort_dropdowns[config.type] = dropdown;
     });
+
+    /* 筛选下拉菜单初始化 */
+    const filter_configs = [
+        { type: 'skins', select_id: 'skins-filter-select', dropdown_id: 'skins-filter-dropdown' },
+        { type: 'sights', select_id: 'sights-filter-select', dropdown_id: 'sights-filter-dropdown' },
+        { type: 'tasks', select_id: 'tasks-filter-select', dropdown_id: 'tasks-filter-dropdown' },
+        { type: 'models', select_id: 'models-filter-select', dropdown_id: 'models-filter-dropdown' },
+        { type: 'hangar', select_id: 'hangar-filter-select', dropdown_id: 'hangar-filter-dropdown' }
+    ];
+
+    this.resource_filter_dropdowns = this.resource_filter_dropdowns || {};
+
+    filter_configs.forEach((config) => {
+        const select_el = document.getElementById(config.select_id);
+        const dropdown_el = document.getElementById(config.dropdown_id);
+        if (!select_el || !dropdown_el) return;
+
+        const options = Array.from(select_el.options).map((option) => ({
+            value: option.value,
+            label: option.textContent.trim()
+        }));
+
+        const dropdown = new AppDropdownMenu({
+            id: `${config.type}-resource-filter`,
+            containerId: config.dropdown_id,
+            options,
+            placeholder: '筛选',
+            size: 'sm',
+            width: '90px',
+            onChange: (value) => {
+                select_el.value = value;
+                select_el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+
+        dropdown.setValue(select_el.value || options[0]?.value || '', false);
+        this.resource_filter_dropdowns[config.type] = dropdown;
+    });
 };
 
 app.switchResourceViewMode = function (resource_type, mode) {
@@ -5219,9 +5317,31 @@ app.sortSightsNew = function (sortKey) {
     this._renderSightsView();
 };
 
+app.filterSightsStatus = function (value) {
+    this._sightsFilterStatus = value || 'all';
+    this._renderSightsView();
+};
+
+app.toggleSightsSortOrder = function () {
+    this._sightsSortAsc = !this._sightsSortAsc;
+    const btn = document.getElementById('sights-sort-order-btn');
+    if (btn) btn.classList.toggle('is-asc', this._sightsSortAsc);
+    this._renderSightsView();
+};
+
 app._getFilteredSights = function () {
     const query = String(this._sightsSearchQuery || "").trim().toLowerCase();
     let items = Array.isArray(this._sightsItems) ? this._sightsItems.slice() : [];
+
+    /* 状态筛选 */
+    const filterStatus = this._sightsFilterStatus || 'all';
+    if (filterStatus !== 'all') {
+        items = items.filter(item => {
+            const name = String(item.name || '');
+            const isDisabled = !!item.disabled || name.endsWith('.AimerWT_BAN');
+            return filterStatus === 'disabled' ? isDisabled : !isDisabled;
+        });
+    }
 
     if (query) {
         items = items.filter(item => {
@@ -5239,18 +5359,21 @@ app._getFilteredSights = function () {
     }
 
     const sortKey = this._sightsSortKey || "update_time";
+    const asc = !!this._sightsSortAsc;
     items.sort((a, b) => {
+        let cmp = 0;
         if (sortKey === "name") {
             const aName = String(a.display_name || a.name || "");
             const bName = String(b.display_name || b.name || "");
-            return aName.localeCompare(bName, "zh-CN", { numeric: true });
+            cmp = aName.localeCompare(bName, "zh-CN", { numeric: true });
+        } else if (sortKey === "size") {
+            cmp = Number(b.size_bytes || 0) - Number(a.size_bytes || 0);
+        } else {
+            const bTime = Number(b.mtime || b.update_time || 0);
+            const aTime = Number(a.mtime || a.update_time || 0);
+            cmp = bTime - aTime;
         }
-        if (sortKey === "size") {
-            return Number(b.size_bytes || 0) - Number(a.size_bytes || 0);
-        }
-        const bTime = Number(b.update_time || b.mtime || b.modified_time || 0);
-        const aTime = Number(a.update_time || a.mtime || a.modified_time || 0);
-        return bTime - aTime;
+        return asc ? -cmp : cmp;
     });
 
     return items;

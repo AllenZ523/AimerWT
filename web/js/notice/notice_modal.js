@@ -389,8 +389,20 @@
     /* 预选表情面板 */
     var REACTION_EMOJI_PALETTE = ['👍','❤️','😄','😮','🎉','🔥','😢','👀','👎','🤔','💯','🙏','✨','😂','🤣','😍','🥺','💀','😎','🫡'];
 
+    function isFeatureEnabled(featureKey) {
+        if (window.app && typeof window.app.getServerUserFeatures === 'function') {
+            return window.app.getServerUserFeatures(featureKey);
+        }
+        if (window._aimerUserFeatures &&
+            Object.prototype.hasOwnProperty.call(window._aimerUserFeatures, featureKey)) {
+            return window._aimerUserFeatures[featureKey] !== false;
+        }
+        return false;
+    }
+
     /* 渲染反应栏内容（嵌入 footer 内部，与"我已知晓"按钮同行） */
     function _buildReactionBarHtml(noticeId) {
+        if (!isFeatureEnabled('notice_reaction_enabled')) return '';
         if (!noticeId) return '';
         return '<div class="notice-reaction-inline" data-notice-reaction-id="' + noticeId + '">' +
             '<span class="reaction-loading" style="font-size:12px;color:#9ca3af;">加载中...</span>' +
@@ -401,6 +413,7 @@
     var _reactionPendingMap = {};
 
     function _loadAndRenderReactions(noticeId, options) {
+        if (!isFeatureEnabled('notice_reaction_enabled')) return;
         options = options || {};
         hydrateClientContext(true).then(function () {
             var baseUrl = (window._telemetryBaseUrl || '').replace(/\/+$/, '');
@@ -543,6 +556,7 @@
 
     /* 提交/取消反应 */
     function _submitReaction(noticeId, emoji) {
+        if (!isFeatureEnabled('notice_reaction_enabled')) return;
         if (_reactionPendingMap[noticeId]) return;
         hydrateClientContext(true).then(function () {
             var baseUrl = (window._telemetryBaseUrl || '').replace(/\/+$/, '');
@@ -635,10 +649,7 @@
             parseMarkdown: parseMarkdown,
             parseArticleMarkdown: parseArticleMarkdown,
             renderMarkdownSafe: renderMarkdownSafe,
-            isFeatureEnabled: function(featureKey) {
-                return !(window.app && typeof window.app.getServerUserFeatures === 'function') ||
-                    window.app.getServerUserFeatures(featureKey);
-            },
+            isFeatureEnabled: isFeatureEnabled,
             buildReactionBarHtml: function(noticeId) {
                 return _buildReactionBarHtml(noticeId);
             }
@@ -651,7 +662,7 @@
         var commentPanelActive = helpers.isFeatureEnabled('notice_comment_enabled') &&
             window.NoticeCommentPanel && typeof window.NoticeCommentPanel.renderPanel === 'function' &&
             !!shell.querySelector('.nc-panel[data-nc-notice-id]');
-        if (safeItem.id && !commentPanelActive) {
+        if (safeItem.id && helpers.isFeatureEnabled('notice_reaction_enabled') && !commentPanelActive) {
             _loadAndRenderReactions(safeItem.id);
         }
 

@@ -13,6 +13,16 @@
     var _activeTab = 'system';
     var _settingsOpen = false;
 
+    function isNotificationCenterEnabled() {
+        if (window.app && typeof window.app.getServerUserFeatures === 'function') {
+            return window.app.getServerUserFeatures('notification_center_enabled');
+        }
+        if (window._aimerUserFeatures && window._aimerUserFeatures.notification_center_enabled === false) {
+            return false;
+        }
+        return false;
+    }
+
     /* ---- 时间格式化 ---- */
 
     function formatRelativeTime(ts) {
@@ -37,6 +47,7 @@
     /* ---- DOM 创建 ---- */
 
     function ensurePanel() {
+        if (!isNotificationCenterEnabled()) return;
         if (_panel && document.body.contains(_panel)) return;
 
         // 透明遮罩（用于点击外部关闭）
@@ -187,6 +198,7 @@
     }
 
     function renderList() {
+        if (!isNotificationCenterEnabled()) return;
         if (!_panel || !window.NotificationBellModule) return;
         var listEl = _panel.querySelector('#notif-list');
         if (!listEl) return;

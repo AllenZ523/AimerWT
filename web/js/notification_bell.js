@@ -26,6 +26,16 @@
     var _proximityBound = false;
     var _ringTimer = null;
 
+    function isNotificationCenterEnabled() {
+        if (window.app && typeof window.app.getServerUserFeatures === 'function') {
+            return window.app.getServerUserFeatures('notification_center_enabled');
+        }
+        if (window._aimerUserFeatures && window._aimerUserFeatures.notification_center_enabled === false) {
+            return false;
+        }
+        return false;
+    }
+
     /* ---- localStorage 读写 ---- */
 
     function loadJSON(key, fallback) {
@@ -150,6 +160,12 @@
     function updateBellState() {
         var btn = getBellButton();
         if (!btn) return;
+        if (!isNotificationCenterEnabled()) {
+            btn.style.display = 'none';
+            btn.classList.remove('bell-has-new', 'bell-panel-open', 'bell-ringing', 'near');
+            return;
+        }
+        btn.style.display = '';
         var hasNew = getTotalUnread() > 0;
         btn.classList.toggle('bell-has-new', hasNew);
         btn.classList.toggle('bell-panel-open', _panelOpen);
@@ -181,6 +197,7 @@
     /* ---- 鼠标接近检测 ---- */
 
     function updateProximity(clientX, clientY) {
+        if (!isNotificationCenterEnabled()) return;
         var btn = getBellButton();
         if (!btn) return;
         // 有新消息或面板打开时无需接近检测（按钮已可见）
@@ -205,6 +222,7 @@
     /* ---- 面板控制 ---- */
 
     function openPanel() {
+        if (!isNotificationCenterEnabled()) return;
         _panelOpen = true;
         stopRing();
         updateBellState();
@@ -225,6 +243,7 @@
     }
 
     function togglePanel() {
+        if (!isNotificationCenterEnabled()) return;
         if (_panelOpen) {
             closePanel();
         } else {
@@ -239,6 +258,7 @@
      * @param {Object} msg - { title, content, icon?, timestamp? }
      */
     function pushSystemMessage(msg) {
+        if (!isNotificationCenterEnabled()) return;
         if (!msg || typeof msg !== 'object') return;
         var dedupeKey = buildSystemMessageKey(msg);
         var contentKey = buildSystemMessageContentKey(msg);
@@ -280,6 +300,7 @@
      * @param {Array} msgList
      */
     function pushSystemMessages(msgList) {
+        if (!isNotificationCenterEnabled()) return;
         if (!Array.isArray(msgList)) return;
         msgList.forEach(function (m) { pushSystemMessage(m); });
     }
@@ -289,6 +310,7 @@
      * @param {Object} msg - { action: "like"|"reply", actor, content?, notice_title?, timestamp? }
      */
     function pushInteractionMessage(msg) {
+        if (!isNotificationCenterEnabled()) return;
         if (!msg || typeof msg !== 'object') return;
         var settings = getSettings();
         if (!settings.interaction_notify_enabled) return;
@@ -331,9 +353,13 @@
     /* ---- 初始化 ---- */
 
     function init() {
+        var btn = getBellButton();
+        if (!isNotificationCenterEnabled()) {
+            if (btn) btn.style.display = 'none';
+            return;
+        }
         pruneExpiredSystemMessages();
         recalcUnread();
-        var btn = getBellButton();
         if (btn) {
             btn.addEventListener('click', function (e) {
                 e.preventDefault();

@@ -46,6 +46,15 @@
     flex-direction: column;
 }
 
+/* 无评论面板时 .nc-left-col 充当唯一子容器，继承列方向弹性布局 */
+.notice-article-modal:not(.nc-split-layout) .nc-left-col {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: none;
+}
+
 .notice-article-modal.nc-split-layout {
     width: min(1100px, 95vw);
     flex-direction: row;

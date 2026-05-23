@@ -919,6 +919,103 @@
 }
 
 /* ===========================
+   筛选与排序方向控件
+   =========================== */
+
+/* 筛选下拉容器：与排序下拉平行 */
+.res-filter-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    position: relative;
+}
+
+.res-filter-wrapper i.res-filter-icon {
+    font-size: 14px;
+    color: var(--text-sec);
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-wrapper {
+    width: 90px !important;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-trigger {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 7px;
+    background: var(--bg-body);
+    font-size: 12px;
+    box-shadow: none;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-wrapper.active .app-dropdown-trigger {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.12);
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-menu {
+    z-index: 30;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-option {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-left: none;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-option:hover,
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-option.selected {
+    border-left: none;
+}
+
+/* 隐藏的原生筛选 select */
+.res-native-filter {
+    position: absolute;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0;
+    pointer-events: none;
+    margin: 0;
+}
+
+/* 排序方向切换按钮 */
+.res-sort-order-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--bg-body);
+    color: var(--text-sec);
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.res-sort-order-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(255, 153, 0, 0.06);
+}
+
+.res-sort-order-btn:active {
+    transform: scale(0.93);
+}
+
+.res-sort-order-btn i {
+    transition: transform 0.25s ease;
+}
+
+.res-sort-order-btn.is-asc i {
+    transform: scaleY(-1);
+}
+
+/* ===========================
    深色模式适配
    =========================== */
 

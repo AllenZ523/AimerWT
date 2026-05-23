@@ -16,6 +16,7 @@
     var _loadRetryTimer = 0;
     var _loadFailureCount = 0;
     var _featureConfig = {
+        user_profile_enabled: true,
         badge_system_enabled: true,
         nickname_change_enabled: true,
         avatar_upload_enabled: true
@@ -24,10 +25,28 @@
 
     function normalizeFeatureConfig(raw) {
         return {
+            user_profile_enabled: !(raw && raw.user_profile_enabled === false),
             badge_system_enabled: !(raw && raw.badge_system_enabled === false),
             nickname_change_enabled: !(raw && raw.nickname_change_enabled === false),
             avatar_upload_enabled: !(raw && raw.avatar_upload_enabled === false)
         };
+    }
+
+    function isProfileEnabled() {
+        if (window.app && typeof window.app.getServerUserFeatures === 'function') {
+            return window.app.getServerUserFeatures('user_profile_enabled');
+        }
+        if (window._aimerUserFeatures && window._aimerUserFeatures.user_profile_enabled === false) {
+            return false;
+        }
+        return _featureConfig.user_profile_enabled !== false;
+    }
+
+    function syncProfileCardVisibility() {
+        var card = document.getElementById('user-profile-card');
+        if (card) {
+            card.style.display = isProfileEnabled() ? '' : 'none';
+        }
     }
 
     function getMachineID() {
@@ -214,8 +233,10 @@
     }
 
     function renderProfile(profile) {
+        if (!isProfileEnabled()) return;
         _profile = profile;
         _featureConfig = normalizeFeatureConfig({
+            user_profile_enabled: true,
             badge_system_enabled: profile.badges_enabled,
             nickname_change_enabled: profile.nickname_change_enabled,
             avatar_upload_enabled: profile.avatar_upload_enabled
@@ -241,6 +262,12 @@
 
     function applyFeatureSettings(rawConfig) {
         _featureConfig = normalizeFeatureConfig(rawConfig || _featureConfig);
+        syncProfileCardVisibility();
+
+        if (!isProfileEnabled()) {
+            stopForCurrentLanguage();
+            return;
+        }
 
         var card = document.getElementById('user-profile-card');
         if (card) {
@@ -292,6 +319,7 @@
     }
 
     function isOnlineProfileAvailable() {
+        if (!isProfileEnabled()) return false;
         if (window.app && typeof window.app.isOnlineFeatureAvailable === 'function') {
             return window.app.isOnlineFeatureAvailable();
         }
@@ -305,6 +333,7 @@
         clearLoadRetry();
         _loadFailureCount = 0;
         setOfflineTipVisible(false);
+        syncProfileCardVisibility();
     }
 
     function scheduleLoadRetry(delayMs) {
@@ -459,6 +488,11 @@
 
     // 供外部调用（例如 telemetry 上报完成后，已知 machine_id 和 report_url 时初始化）
     function init(machineID, reportURL) {
+        syncProfileCardVisibility();
+        if (!isProfileEnabled()) {
+            stopForCurrentLanguage();
+            return;
+        }
         if (machineID) _machineID = machineID;
         if (reportURL) {
             window._reportURL = reportURL;
@@ -473,6 +507,7 @@
     }
 
     function showVerifyDialog() {
+        if (!isProfileEnabled()) return;
         if (window.app && typeof window.app.showAlert === 'function') {
             window.app.showAlert(
                 '请求身份认证',
@@ -502,6 +537,11 @@
 
     // 如果已有全局 machine_id，延迟初始化
     document.addEventListener('DOMContentLoaded', function () {
+        syncProfileCardVisibility();
+        if (!isProfileEnabled()) {
+            stopForCurrentLanguage();
+            return;
+        }
         if (window._telemetryHWID && isOnlineProfileAvailable()) {
             _serviceBaseURL = normalizeServiceBaseURL(window._telemetryBaseUrl || window._reportURL || '');
             setTimeout(loadProfile, 500);

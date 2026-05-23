@@ -29,6 +29,9 @@ const AIChat = {
     
     // 初始化
     init() {
+        if (window.AIManager && typeof window.AIManager.isEnabled === 'function' && !window.AIManager.isEnabled()) {
+            return;
+        }
         this._createDOM();
 
         // 初始化子模块
@@ -295,6 +298,9 @@ const AIChat = {
     
     // 绑定Logo点击事件
     _bindLogoClick() {
+        if (window.AIManager && typeof window.AIManager.isEnabled === 'function' && !window.AIManager.isEnabled()) {
+            return;
+        }
         const logo = document.querySelector('.app-logo');
         if (logo) {
             logo.style.cursor = 'pointer';
@@ -386,6 +392,9 @@ const AIChat = {
     
     // 打开聊天框
     open() {
+        if (window.AIManager && typeof window.AIManager.isEnabled === 'function' && !window.AIManager.isEnabled()) {
+            return;
+        }
         // 防重入：弹窗动画进行中不响应
         if (this.state._opening) return;
 
@@ -524,6 +533,9 @@ const AIChat = {
     
     // 切换聊天框
     toggle() {
+        if (window.AIManager && typeof window.AIManager.isEnabled === 'function' && !window.AIManager.isEnabled()) {
+            return;
+        }
         if (this.state.isOpen) {
             this.close();
         } else {

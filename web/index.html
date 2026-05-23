@@ -286,6 +286,16 @@
                                 <input type="text" placeholder="搜索涂装名称或描述" id="skins-search-input" oninput="app.filterSkinsNew(this.value)">
                             </div>
                             <div class="res-toolbar-inline-controls">
+                                <div class="res-filter-wrapper">
+                                    <i class="ri-filter-3-line res-filter-icon"></i>
+                                    <span>筛选:</span>
+                                    <div class="res-sort-menu" id="skins-filter-dropdown"></div>
+                                    <select class="res-native-filter" id="skins-filter-select" onchange="app.filterSkinsStatus(this.value)" aria-hidden="true" tabindex="-1">
+                                        <option value="all">全部</option>
+                                        <option value="enabled">已启用</option>
+                                        <option value="disabled">已禁用</option>
+                                    </select>
+                                </div>
                                 <div class="res-sort-wrapper">
                                     <i class="ri-sort-desc"></i>
                                     <span>排序:</span>
@@ -296,6 +306,9 @@
                                         <option value="size">大小</option>
                                     </select>
                                 </div>
+                                <button class="res-sort-order-btn" id="skins-sort-order-btn" title="切换排序方向" onclick="app.toggleSkinsSortOrder()">
+                                    <i class="ri-sort-desc"></i>
+                                </button>
                             </div>
                             <div class="res-toolbar-right">
                                 <label class="res-select-all">
@@ -395,6 +408,16 @@
                                 <input type="text" placeholder="搜索炮镜名称或描述" id="sights-search-input" oninput="app.filterSightsNew(this.value)">
                             </div>
                             <div class="res-toolbar-inline-controls">
+                                <div class="res-filter-wrapper">
+                                    <i class="ri-filter-3-line res-filter-icon"></i>
+                                    <span>筛选:</span>
+                                    <div class="res-sort-menu" id="sights-filter-dropdown"></div>
+                                    <select class="res-native-filter" id="sights-filter-select" onchange="app.filterSightsStatus(this.value)" aria-hidden="true" tabindex="-1">
+                                        <option value="all">全部</option>
+                                        <option value="enabled">已启用</option>
+                                        <option value="disabled">已禁用</option>
+                                    </select>
+                                </div>
                                 <div class="res-sort-wrapper">
                                     <i class="ri-sort-desc"></i> <span>排序:</span>
                                     <div class="res-sort-menu" id="sights-sort-dropdown"></div>
@@ -404,6 +427,9 @@
                                         <option value="size">大小</option>
                                     </select>
                                 </div>
+                                <button class="res-sort-order-btn" id="sights-sort-order-btn" title="切换排序方向" onclick="app.toggleSightsSortOrder()">
+                                    <i class="ri-sort-desc"></i>
+                                </button>
                             </div>
                             <div class="res-toolbar-right">
                                 <label class="res-select-all"><input type="checkbox" id="sights-select-all"> 全选</label>
@@ -490,6 +516,16 @@
                                 <input type="text" placeholder="搜索任务名称或描述" id="tasks-search-input" oninput="TaskLibrary.filter_list(this.value)">
                             </div>
                             <div class="res-toolbar-inline-controls">
+                                <div class="res-filter-wrapper">
+                                    <i class="ri-filter-3-line res-filter-icon"></i>
+                                    <span>筛选:</span>
+                                    <div class="res-sort-menu" id="tasks-filter-dropdown"></div>
+                                    <select class="res-native-filter" id="tasks-filter-select" onchange="TaskLibrary.filter_status(this.value)" aria-hidden="true" tabindex="-1">
+                                        <option value="all">全部</option>
+                                        <option value="enabled">已启用</option>
+                                        <option value="disabled">已禁用</option>
+                                    </select>
+                                </div>
                                 <div class="res-sort-wrapper">
                                     <i class="ri-sort-desc"></i> <span>排序:</span>
                                     <div class="res-sort-menu" id="tasks-sort-dropdown"></div>
@@ -499,6 +535,9 @@
                                         <option value="size">大小</option>
                                     </select>
                                 </div>
+                                <button class="res-sort-order-btn" id="tasks-sort-order-btn" title="切换排序方向" onclick="TaskLibrary.toggle_sort_order()">
+                                    <i class="ri-sort-desc"></i>
+                                </button>
                             </div>
                             <div class="res-toolbar-right">
                                 <label class="res-select-all"><input type="checkbox" id="tasks-select-all"> 全选</label>
@@ -593,6 +632,16 @@
                                 <input type="text" placeholder="搜索模型名称或描述" id="models-search-input" oninput="ModelLibrary.filter_list(this.value)">
                             </div>
                             <div class="res-toolbar-inline-controls">
+                                <div class="res-filter-wrapper">
+                                    <i class="ri-filter-3-line res-filter-icon"></i>
+                                    <span>筛选:</span>
+                                    <div class="res-sort-menu" id="models-filter-dropdown"></div>
+                                    <select class="res-native-filter" id="models-filter-select" onchange="ModelLibrary.filter_status(this.value)" aria-hidden="true" tabindex="-1">
+                                        <option value="all">全部</option>
+                                        <option value="enabled">已启用</option>
+                                        <option value="disabled">已禁用</option>
+                                    </select>
+                                </div>
                                 <div class="res-sort-wrapper">
                                     <i class="ri-sort-desc"></i> <span>排序:</span>
                                     <div class="res-sort-menu" id="models-sort-dropdown"></div>
@@ -602,6 +651,9 @@
                                         <option value="size">大小</option>
                                     </select>
                                 </div>
+                                <button class="res-sort-order-btn" id="models-sort-order-btn" title="切换排序方向" onclick="ModelLibrary.toggle_sort_order()">
+                                    <i class="ri-sort-desc"></i>
+                                </button>
                             </div>
                             <div class="res-toolbar-right">
                                 <label class="res-select-all"><input type="checkbox" id="models-select-all"> 全选</label>
@@ -699,6 +751,16 @@
                                 <input type="text" placeholder="搜索机库名称或描述" id="hangar-search-input" oninput="Hangar.filter_list(this.value)">
                             </div>
                             <div class="res-toolbar-inline-controls">
+                                <div class="res-filter-wrapper">
+                                    <i class="ri-filter-3-line res-filter-icon"></i>
+                                    <span>筛选:</span>
+                                    <div class="res-sort-menu" id="hangar-filter-dropdown"></div>
+                                    <select class="res-native-filter" id="hangar-filter-select" onchange="Hangar.filter_status(this.value)" aria-hidden="true" tabindex="-1">
+                                        <option value="all">全部</option>
+                                        <option value="enabled">已启用</option>
+                                        <option value="disabled">已禁用</option>
+                                    </select>
+                                </div>
                                 <div class="res-sort-wrapper">
                                     <i class="ri-sort-desc"></i> <span>排序:</span>
                                     <div class="res-sort-menu" id="hangar-sort-dropdown"></div>
@@ -708,6 +770,9 @@
                                         <option value="size">大小</option>
                                     </select>
                                 </div>
+                                <button class="res-sort-order-btn" id="hangar-sort-order-btn" title="切换排序方向" onclick="Hangar.toggle_sort_order()">
+                                    <i class="ri-sort-desc"></i>
+                                </button>
                             </div>
                             <div class="res-toolbar-right">
                                 <label class="res-select-all"><input type="checkbox" id="hangar-select-all"> 全选</label>
@@ -1064,7 +1129,7 @@
         <div id="page-settings" class="page">
 
             <!-- 个人信息卡片 -->
-            <div class="card up-card" id="user-profile-card">
+            <div class="card up-card" id="user-profile-card" style="display:none;">
                 <!-- 顶部装饰条 -->
                 <div class="up-hero-bar" id="up-hero-bar"></div>
 
@@ -2077,7 +2142,7 @@
     <button id="btn-guide-help" type="button" onclick="app.startGuide(true)" title="新手教程" aria-label="新手教程">
         <i class="ri-question-line"></i>
     </button>
-    <button id="btn-notification-bell" type="button" title="消息中心" aria-label="消息中心">
+    <button id="btn-notification-bell" type="button" title="消息中心" aria-label="消息中心" style="display:none;">
         <i class="ri-notification-3-line"></i>
         <span class="bell-badge"></span>
     </button>
