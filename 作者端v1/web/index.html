@@ -367,8 +367,11 @@
 
                     <div class="page" id="page-settings">
                         <section class="setting-card card-like settings-guide-card">
-                            <h2><i class="ri-book-open-line"></i> 作者端说明界面（预留）</h2>
-                            <p>此页面为预留页面，没总结好写啥。</p>
+                            <h2><i class="ri-book-open-line"></i> 作者端说明与使用指南</h2>
+                            <div class="settings-intro-banner">
+                                <i class="ri-information-line"></i>
+                                <p>这是作者端的第一个版本，为了方便作者们适配语音包而编写，但可能存在BUG，遇到BUG和有建议都可以直接向我反馈，未来UI和布局也都可能会有进一步的更改。</p>
+                            </div>
                             <div class="settings-guide-list">
                                 <article class="settings-guide-item">
                                     <h4>1. 语音包管理</h4>
@@ -398,18 +401,15 @@
                         <div class="toolbox-layout">
                             <!-- 左侧：设置面板 -->
                             <section class="toolbox-settings-pane card-like">
-                                <div class="toolbox-settings-header">
-                                    <i class="ri-image-edit-line"></i>
-                                    <h2>图片转 WebP</h2>
-                                </div>
-
                                 <div class="toolbox-section">
                                     <div class="toolbox-section-label">
                                         <i class="ri-file-image-line"></i>
                                         <span>选择图片文件</span>
                                     </div>
                                     <div class="toolbox-dropzone" id="toolbox-dropzone">
-                                        <i class="ri-drag-drop-line"></i>
+                                        <div class="dropzone-icon-wrap">
+                                            <i class="ri-image-add-line"></i>
+                                        </div>
                                         <p>拖拽图片到这里，或点击选择文件</p>
                                         <small>支持 PNG · JPG · BMP · GIF · TIFF · WebP</small>
                                         <button class="btn-v2 primary" type="button" id="btn-toolbox-select-files">
