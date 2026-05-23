@@ -2961,3 +2961,96 @@ a.contributor-card {
         gap: 24px;
     }
 }
+
+/* 语音包卡片详情页模态框高级缓入缓出与缩放动画 */
+.mod-preview-overlay {
+    background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.03), transparent 38%),
+        rgba(0, 0, 0, 0.52);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 进场动画：遮罩层渐入 + 模糊渐现 */
+.mod-preview-overlay.show {
+    animation: skinModalOverlayFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 进场动画：详情页面板缩放 + 向上缓入 */
+.mod-preview-overlay.show .mod-preview-modal-v2 {
+    animation: skinModalContentScaleUp 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 退场动画：遮罩层渐隐 + 模糊退去 */
+.mod-preview-overlay.hiding {
+    animation: skinModalOverlayFadeOut 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 退场动画：详情页面板缩放 + 向下渐隐 */
+.mod-preview-overlay.hiding .mod-preview-modal-v2 {
+    animation: skinModalContentScaleDown 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 通用高性能轻量模态框动画 */
+#modal-launch-settings,
+#modal-redeem-code,
+#modal-confirm,
+#modal-feedback {
+    background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.03), transparent 38%),
+        rgba(0, 0, 0, 0.52);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 进场动画：遮罩层渐入 + 模糊渐现 */
+#modal-launch-settings.show,
+#modal-redeem-code.show,
+#modal-confirm.show,
+#modal-feedback.show {
+    animation: skinModalOverlayFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 进场动画：模态框面板缩放 + 向上缓入 */
+#modal-launch-settings.show .modal-content,
+#modal-redeem-code.show .modal-content,
+#modal-confirm.show .modal-content,
+#modal-feedback.show .modal-content {
+    animation: modalContentLightFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 退场动画：遮罩层渐隐 + 模糊退去 */
+#modal-launch-settings.hiding,
+#modal-redeem-code.hiding,
+#modal-confirm.hiding,
+#modal-feedback.hiding {
+    animation: skinModalOverlayFadeOut 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 退场动画：模态框面板缩放 + 向下渐隐 */
+#modal-launch-settings.hiding .modal-content,
+#modal-redeem-code.hiding .modal-content,
+#modal-confirm.hiding .modal-content,
+#modal-feedback.hiding .modal-content {
+    animation: modalContentLightFadeOut 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalContentLightFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes modalContentLightFadeOut {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.97) translateY(4px);
+    }
+}

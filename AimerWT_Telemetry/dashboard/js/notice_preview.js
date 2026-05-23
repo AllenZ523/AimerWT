@@ -160,7 +160,7 @@
             '<div class="np-hero-title">' + esc(pinned.title) + '</div>' +
             (preview ? '<div class="np-hero-desc">' + esc(preview) + '</div>' : '') +
             '</div>' +
-            '<div class="np-section"><span>往期动态</span><span class="np-section-line"></span></div>' +
+            '<div class="np-section"><span>其他动态</span><span class="np-section-line"></span></div>' +
             '<div class="np-history">' + (listHtml || '<div style="text-align:center;color:var(--np-text-muted);font-size:11px;padding:12px 0;">暂无更多公告</div>') + '</div>' +
             '<div class="np-footer"><span class="np-footer-dot"></span><span>预览模式 · 模拟客户端显示效果</span></div>' +
             '</div>';

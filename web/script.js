@@ -1789,6 +1789,7 @@ const app = {
         if (el.classList.contains('show')) return;
         el.classList.remove('hiding');
         el.classList.add('show');
+        void el.offsetWidth; // 强制触发重排，确保渐入过渡动画完美执行
     },
 
     closeModal(modalId) {
@@ -1815,6 +1816,7 @@ const app = {
 
         modal.classList.remove('hiding');
         modal.classList.add('show');
+        void modal.offsetWidth; // 强制触发重排，确保兑换码模态框渐入与缩放动画完美播放
 
         if (input) {
             window.setTimeout(() => {
@@ -2753,6 +2755,7 @@ const app = {
 
         modal.classList.remove('hiding');
         modal.classList.add('show');
+        void modal.offsetWidth; // 强制触发重排，确保启动设置模态框缓入过渡和面板轻微升起完美渲染
     },
 
     async saveLaunchSettings(mode) {
@@ -7259,6 +7262,7 @@ app.setupGlobalDragDrop = function () {
         bindLinkActions(overlay, mod);
 
         overlay.classList.remove('hiding');
+        void overlay.offsetWidth; // 强制触发重排，确保渐入动画完美播放
         overlay.classList.add('show');
         schedulePreviewHeaderAlign(overlay);
     }

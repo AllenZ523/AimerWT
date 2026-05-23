@@ -215,7 +215,7 @@
             if (app) app._noticeMap = {};
             container.innerHTML = `
                 <div class="notice-section">
-                    <span class="notice-section-text">往期动态</span>
+                    <span class="notice-section-text">其他动态</span>
                     <span class="notice-section-line"></span>
                 </div>
                 <div class="notice-history-wrap">
@@ -285,7 +285,7 @@
         container.innerHTML = `
             ${pinnedHtml}
             <div class="notice-section">
-                <span class="notice-section-text">往期动态</span>
+                <span class="notice-section-text">其他动态</span>
                 <span class="notice-section-line"></span>
             </div>
             <div class="notice-history-wrap">
