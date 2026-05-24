@@ -159,46 +159,79 @@ def record_diagnostic_event(category, event, level="info", message="", **data):
 class _ThemeUnlockFallbackService:
     """GitHub 公开版缺少口令模块时的降级实现。"""
 
+    _public_theme_files = {
+        "default.json",
+        "dark.json",
+        "aimer.json",
+        "pink.json",
+    }
+    _hidden_theme_files = {
+        "bi_an.json",
+        "beiku.json",
+        "lianying.json",
+        "chifeng.json",
+        "supporter.json",
+    }
+
     def __init__(self, config_manager):
         self._cfg_mgr = config_manager
 
+    @staticmethod
+    def _normalize_filename(filename: str) -> str:
+        return str(filename or "").strip()
+
     def is_hidden_theme(self, filename: str) -> bool:
-        return False
+        return self._normalize_filename(filename) in self._hidden_theme_files
 
     def is_theme_accessible(self, filename: str) -> bool:
-        return True
+        filename = self._normalize_filename(filename)
+        if filename in self._public_theme_files:
+            return True
+        if filename in self._hidden_theme_files:
+            return filename in set(self._cfg_mgr.get_unlocked_themes())
+        return False
 
     def filter_theme_list(self, theme_list: list[dict]) -> list[dict]:
-        return theme_list
+        return [item for item in theme_list if self.is_theme_accessible(item.get("filename"))]
 
     def get_accessible_active_theme(self, filename: str) -> str:
-        filename = str(filename or "default.json")
+        filename = self._normalize_filename(filename) or "default.json"
         theme_path = WEB_DIR / "themes" / filename
-        return filename if theme_path.exists() else "default.json"
+        return filename if theme_path.exists() and self.is_theme_accessible(filename) else "default.json"
 
     def redeem_theme_code(self, code: str) -> dict:
         return {"success": False, "message": "GitHub版本不支持，请使用分发版本。"}
 
     def unlock_theme_by_name(self, filename: str) -> dict:
-        filename = str(filename or "").strip()
+        filename = self._normalize_filename(filename)
         if not filename:
             return {"success": False, "message": "缺少主题文件名"}
+
+        if filename not in self._hidden_theme_files:
+            return {"success": False, "message": f"主题 {filename} 不在隐藏主题列表中"}
 
         theme_path = WEB_DIR / "themes" / filename
         if not theme_path.exists():
             return {"success": False, "message": f"主题文件不存在: {filename}"}
 
-        # 公开版没有隐藏主题模块时，允许已存在的主题平滑通过，避免服务端兑换成功后客户端报错。
-        self._cfg_mgr.set_active_theme(filename)
+        unlocked = set(self._cfg_mgr.get_unlocked_themes())
+        already_unlocked = filename in unlocked
+        if not already_unlocked:
+            unlocked.add(filename)
+            valid = [name for name in self._hidden_theme_files if name in unlocked]
+            self._cfg_mgr.set_unlocked_themes(valid)
+
         return {
             "success": True,
-            "already_unlocked": True,
+            "already_unlocked": already_unlocked,
             "theme_file": filename,
             "message": "主题已可用",
         }
 
     def reset_unlocked_themes(self) -> bool:
-        return self._cfg_mgr.set_unlocked_themes([])
+        unlocked = set(self._cfg_mgr.get_unlocked_themes())
+        preserved = [name for name in self._hidden_theme_files if name == "supporter.json" and name in unlocked]
+        return self._cfg_mgr.set_unlocked_themes(preserved)
 
 
 def _is_localization_blk_modified_for_export(lang_dir: Path) -> bool:

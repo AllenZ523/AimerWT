@@ -19,9 +19,9 @@
     max-height: 85vh;
     min-height: 85vh;
     border-radius: 24px;
-    background: #ffffff;
-    border: 1px solid #f3f4f6;
-    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.12);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-card, 0 24px 48px -12px rgba(0, 0, 0, 0.12));
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -51,8 +51,8 @@
 .notice-react-header {
     padding: 24px 32px;
     padding-right: 78px;
-    border-bottom: 1px solid #f9fafb;
-    background: rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-card);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -71,7 +71,7 @@
     font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.02em;
-    color: #111827;
+    color: var(--text-main);
 }
 
 .notice-react-subline {
@@ -81,7 +81,7 @@
     gap: 8px;
     font-size: 12px;
     font-weight: 700;
-    color: #9ca3af;
+    color: var(--text-sec);
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
@@ -91,14 +91,14 @@
     max-width: 620px;
     font-size: 13px;
     line-height: 1.65;
-    color: #6b7280;
+    color: var(--text-sec);
 }
 
 .notice-react-pulse {
     width: 6px;
     height: 6px;
     border-radius: 999px;
-    background: #3b82f6;
+    background: var(--primary);
 }
 
 .notice-react-close {
@@ -107,18 +107,19 @@
     border: none;
     background: transparent;
     border-radius: 999px;
-    color: #9ca3af;
+    color: var(--text-sec);
     font-size: 22px;
     cursor: pointer;
     position: absolute;
     top: 20px;
     right: 24px;
     z-index: 2;
+    transition: all 0.2s ease;
 }
 
 .notice-react-close:hover {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-main);
 }
 
 .notice-react-content {
@@ -142,7 +143,7 @@
     margin: 0;
     font-size: 15px;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--text-main);
 }
 
 .notice-react-sec-icon {
@@ -171,15 +172,15 @@
 }
 
 .notice-react-sec-gray {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: var(--border-color);
+    color: var(--text-sec);
 }
 
 .notice-react-list {
     list-style: none;
     margin: 0 0 0 14px;
     padding: 0 0 0 24px;
-    border-left: 1.5px solid #f3f4f6;
+    border-left: 1.5px solid var(--border-color);
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -196,22 +197,24 @@
     width: 8px;
     height: 8px;
     border-radius: 999px;
-    border: 2px solid #ffffff;
-    background: #d1d5db;
+    border: 2px solid var(--bg-card);
+    background: var(--border-color);
+    transition: all 0.2s ease;
 }
 
 .notice-react-item-text {
     font-size: 14px;
     line-height: 1.7;
-    color: #4b5563;
+    color: var(--text-sec);
+    transition: color 0.2s ease;
 }
 
 .notice-react-item:hover .notice-react-item-text {
-    color: #111827;
+    color: var(--text-main);
 }
 
 .notice-react-item:hover .notice-react-item-dot {
-    background: #3b82f6;
+    background: var(--primary);
 }
 
 .notice-react-inline-meta {
@@ -228,8 +231,8 @@
     margin: 0 2px;
     padding: 2px 6px;
     border-radius: 6px;
-    background: #f3f4f6;
-    color: #6b7280;
+    background: var(--bg-card-soft, rgba(0, 0, 0, 0.04));
+    color: var(--text-sec);
     font-size: 12px;
     font-weight: 500;
 }
@@ -237,13 +240,13 @@
 .notice-react-fallback {
     font-size: 14px;
     line-height: 1.7;
-    color: #4b5563;
+    color: var(--text-sec);
 }
 
 .notice-react-footer {
     padding: 20px 32px;
-    background: rgba(249, 250, 251, 0.5);
-    border-top: 1px solid #f9fafb;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -252,9 +255,10 @@
 .notice-react-footer p {
     margin: 0;
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--text-sec);
     font-style: italic;
     font-weight: 500;
+    opacity: 0.8;
 }
 
 .notice-react-ack {
@@ -264,15 +268,17 @@
     padding: 10px 20px;
     border: none;
     border-radius: 12px;
-    background: #111827;
+    background: var(--primary);
     color: #ffffff;
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
 .notice-react-ack:hover {
-    background: #000000;
+    background: var(--primary-hover);
+    box-shadow: 0 4px 12px var(--primary-shadow);
 }
 
 @media (max-width: 640px) {
@@ -476,4 +482,51 @@
         grid-template-columns: repeat(6, 1fr);
         min-width: 220px;
     }
+}
+
+/* 暗色模式专属微调 */
+[data-theme="dark"] .notice-react-close:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .notice-react-sec-blue {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+[data-theme="dark"] .notice-react-sec-green {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+}
+[data-theme="dark"] .notice-react-sec-red {
+    background: rgba(244, 63, 94, 0.15);
+    color: #f87171;
+}
+[data-theme="dark"] .notice-react-token {
+    background: rgba(255, 255, 255, 0.08);
+    color: #91b6b8;
+}
+[data-theme="dark"] .notice-reaction-pill {
+    border-color: var(--border-color);
+    background: rgba(255, 255, 255, 0.04);
+}
+[data-theme="dark"] .notice-reaction-pill:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+}
+[data-theme="dark"] .notice-reaction-pill .reaction-count {
+    color: var(--text-sec);
+}
+[data-theme="dark"] .notice-reaction-add-btn {
+    border-color: var(--border-color);
+}
+[data-theme="dark"] .notice-reaction-add-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--primary);
+    border-color: var(--primary);
+}
+[data-theme="dark"] .notice-reaction-picker {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+[data-theme="dark"] .notice-reaction-picker-item:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
