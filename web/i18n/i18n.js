@@ -1,15 +1,19 @@
 (function () {
     const DEFAULT_LOCALE = "zh_cn";
-    const SUPPORTED_LOCALES = ["zh_cn", "zh_tw", "en_us"];
+    const SUPPORTED_LOCALES = ["zh_cn", "zh_tw", "en_us", "ru_ru", "de_de"];
     const HTML_LANG_MAP = {
         zh_cn: "zh-CN",
         zh_tw: "zh-TW",
-        en_us: "en-US"
+        en_us: "en-US",
+        ru_ru: "ru-RU",
+        de_de: "de-DE"
     };
     const LOCALE_NAMES = {
         zh_cn: "简体中文",
         zh_tw: "繁體中文",
-        en_us: "English"
+        en_us: "English",
+        ru_ru: "Русский",
+        de_de: "Deutsch"
     };
     const ONLINE_FEATURE_LOCALES = ["zh_cn", "zh_tw"];
 
@@ -68,6 +72,11 @@
                 const key = el.getAttribute("data-i18n-placeholder");
                 if (key) el.placeholder = this.t(key);
             });
+
+            scope.querySelectorAll("[data-i18n-alt]").forEach((el) => {
+                const key = el.getAttribute("data-i18n-alt");
+                if (key) el.alt = this.t(key);
+            });
         },
 
         setLocale(locale) {
@@ -80,6 +89,11 @@
 
         getLocaleName(locale) {
             return LOCALE_NAMES[normalize_locale(locale)] || LOCALE_NAMES[DEFAULT_LOCALE];
+        },
+
+        getKeys(locale) {
+            const normalized = normalize_locale(locale || this.currentLocale || DEFAULT_LOCALE);
+            return Object.keys(this._messages[normalized] || {}).sort();
         },
 
         isOnlineFeatureAvailable() {

@@ -896,11 +896,17 @@ class SightsManager:
             target_dir = self._normalize_sight_target_dir(options.get("target_dir"))
             return self._import_blk_file(source_path, target_dir=target_dir, progress_callback=progress_callback)
         if ext in self.supported_archive_extensions:
-            result = self.import_sights_zip(source_path, progress_callback=progress_callback, overwrite=False)
+            target_dir = options.get("target_dir") if "target_dir" in options else None
+            result = self.import_sights_zip(
+                source_path,
+                progress_callback=progress_callback,
+                overwrite=False,
+                target_dir=target_dir,
+            )
             return {
                 "success": bool(result.get("ok")),
-                "installed_count": 0,
-                "backup_count": 0,
+                "installed_count": int(result.get("installed_count") or 0),
+                "backup_count": int(result.get("backup_count") or 0),
                 "target_root": str(self._usersights_path or ""),
                 "installed_dirs": [Path(str(result.get("target_dir") or "")).name] if result.get("target_dir") else [],
                 "message": "炮镜压缩包已导入",
@@ -959,6 +965,7 @@ class SightsManager:
         zip_path: str | Path,
         progress_callback: Callable[[int, str], None] | None = None,
         overwrite: bool = False,
+        target_dir: Any = None,
     ) -> dict[str, Any]:
         """
         将炮镜压缩包解压导入到 UserSights，并根据压缩包结构决定目标目录命名策略。
@@ -967,6 +974,7 @@ class SightsManager:
             zip_path: ZIP/RAR/7Z 文件路径
             progress_callback: 进度回调函数 (percentage, message)
             overwrite: 是否复盖同名文件夹
+            target_dir: 指定目标目录时，仅提取压缩包内 .blk 文件并安装到该目录
             
         Returns:
             包含 ok 和 target_dir 的字典
@@ -1020,6 +1028,7 @@ class SightsManager:
             except (OSError, ValueError):
                 return False
 
+        requested_target_dir = target_dir
         target_dir: Path | None = None
         
         try:
@@ -1082,6 +1091,48 @@ class SightsManager:
                 for p in tmp_dir.iterdir()
                 if p.name not in ("__MACOSX",) and p.name.lower() != "desktop.ini"
             ]
+
+            if requested_target_dir is not None:
+                target_dir_name = self._normalize_sight_target_dir(requested_target_dir)
+                target_dir_path = usersights_dir / target_dir_name
+                blk_files = sorted(
+                    [
+                        p for p in tmp_dir.rglob("*.blk")
+                        if p.is_file()
+                        and "__MACOSX" not in str(p.relative_to(tmp_dir))
+                        and "desktop.ini" not in p.name.lower()
+                    ],
+                    key=lambda p: str(p.relative_to(tmp_dir)).lower(),
+                )
+                if not blk_files:
+                    raise SightsImportError("压缩包内未找到 .blk 炮镜文件")
+                installed_count = 0
+                backup_count = 0
+                target_dir_path.mkdir(parents=True, exist_ok=True)
+                for blk_file in blk_files:
+                    target_path = target_dir_path / blk_file.name
+                    backup_path = self._backup_existing_file(target_path)
+                    if backup_path:
+                        backup_count += 1
+                    shutil.move(str(blk_file), str(target_path))
+                    installed_count += 1
+                target_dir = target_dir_path
+                log.info(
+                    "炮镜压缩包按指定目录安装: target=%s files=%s backups=%s",
+                    target_dir_name,
+                    installed_count,
+                    backup_count,
+                )
+                if progress_callback:
+                    progress_callback(98, "完成整理")
+                    progress_callback(100, "导入完成")
+                self._clear_sights_cache()
+                return {
+                    "ok": True,
+                    "target_dir": str(target_dir),
+                    "installed_count": installed_count,
+                    "backup_count": backup_count,
+                }
 
             root_sight_dirs = [
                 p for p in top_level

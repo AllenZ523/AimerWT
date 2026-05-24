@@ -233,19 +233,19 @@ class ConfigManager:
     def get_ui_language(self) -> str:
         """读取当前界面语言。"""
         val = self.config.get("ui_language", "")
-        return val if val in ("zh_cn", "zh_tw", "en_us") else ""
+        return val if val in ("zh_cn", "zh_tw", "en_us", "ru_ru", "de_de") else ""
 
     def set_ui_language(self, lang: str) -> bool:
         """
         更新界面语言并写入 settings.json。
 
         Args:
-            lang: 界面语言 ("zh_cn" / "zh_tw" / "en_us")
+            lang: 界面语言 ("zh_cn" / "zh_tw" / "en_us" / "ru_ru" / "de_de")
 
         Returns:
             bool: 是否成功保存
         """
-        if lang not in ("zh_cn", "zh_tw", "en_us"):
+        if lang not in ("zh_cn", "zh_tw", "en_us", "ru_ru", "de_de"):
             log.warning(f"无效的界面语言: {lang}，使用 zh_cn")
             lang = "zh_cn"
         self.config["ui_language"] = lang

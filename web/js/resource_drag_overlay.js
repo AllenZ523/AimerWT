@@ -39,9 +39,15 @@
                 <div class="resource-drag-overlay-sub"></div>
             </div>
         `;
-        overlay.querySelector(".resource-drag-overlay-title").textContent = config.title || "拖入文件进行导入";
-        overlay.querySelector(".resource-drag-overlay-sub").textContent = config.subtitle || "放到此区域后开始识别文件";
+        overlay.querySelector(".resource-drag-overlay-title").textContent = config.title || t("drop.generic_title");
+        overlay.querySelector(".resource-drag-overlay-sub").textContent = config.subtitle || t("drop.generic_subtitle");
         return overlay;
+    }
+
+    function t(key, params = {}) {
+        if (window.app && typeof app.t === "function") return app.t(key, params);
+        if (window.I18N && typeof I18N.t === "function") return I18N.t(key, params);
+        return key;
     }
 
     function get_target(config) {
@@ -163,7 +169,7 @@
                 const file = get_allowed_file(files, config.allowed_exts);
                 if (!file) {
                     if (window.app && typeof app.showAlert === "function") {
-                        app.showAlert("提示", config.invalid_message || "文件格式不支持", "warn");
+                        app.showAlert(t("common.info"), config.invalid_message || t("common.file_format_unsupported"), "warn");
                     }
                     return;
                 }
@@ -177,7 +183,7 @@
                         } catch (error) {
                             console.error("ResourceDragOverlay on_missing_path failed", error);
                             if (window.app && typeof app.showAlert === "function") {
-                                app.showAlert("错误", config.missing_path_error_message || "打开导入窗口失败", "error");
+                                app.showAlert(t("common.error"), config.missing_path_error_message || t("common.import_window_failed"), "error");
                             }
                             return;
                         }
@@ -185,11 +191,12 @@
                     if (missing_path_handled) return;
                     if (typeof config.on_file_drop === "function") {
                         try {
+                            mark_backend_drop_handled(config);
                             await config.on_file_drop(file, event, files);
                         } catch (error) {
                             console.error("ResourceDragOverlay on_file_drop failed", error);
                             if (window.app && typeof app.showAlert === "function") {
-                                app.showAlert("错误", config.drop_error_message || "导入失败", "error");
+                                app.showAlert(t("common.error"), config.drop_error_message || t("common.import_failed"), "error");
                             }
                         }
                         return;
@@ -199,7 +206,7 @@
                         return;
                     }
                     if (window.app && typeof app.showAlert === "function") {
-                        app.showAlert("提示", config.missing_path_message || "当前环境无法获取拖入文件路径", "warn");
+                        app.showAlert(t("common.info"), config.missing_path_message || t("common.current_env_no_drop_path"), "warn");
                     }
                     return;
                 }
@@ -211,7 +218,7 @@
                     } catch (error) {
                         console.error("ResourceDragOverlay on_drop failed", error);
                         if (window.app && typeof app.showAlert === "function") {
-                            app.showAlert("错误", config.drop_error_message || "导入失败", "error");
+                            app.showAlert(t("common.error"), config.drop_error_message || t("common.import_failed"), "error");
                         }
                     }
                 }

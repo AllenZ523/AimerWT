@@ -131,7 +131,7 @@ const ModelLibrary = {
                 const disabled_label = this._escape_html(this._t('resource.status_disabled'));
                 const title_text = display_name === folder_name
                     ? String(it.path || '')
-                    : `${display_name}\n原始文件夹名: ${folder_name}\n${it.path || ''}`;
+                    : `${display_name}\n${this._t('resource.original_folder_title', { name: folder_name })}\n${it.path || ''}`;
 
                 return `
                     <div class="small-card animate-in${is_disabled ? ' is-disabled-resource' : ''}" title="${this._escape_html(title_text)}" data-item-name="${safe_name}" data-resource-name-encoded="${encodeURIComponent(folder_name)}" data-disabled="${is_disabled ? '1' : '0'}">
@@ -318,42 +318,42 @@ const ModelLibrary = {
                     <div class="skin-edit-layout">
                         <div class="skin-edit-preview-panel">
                             <div class="skin-cover-edit skin-edit-cover" onclick="ModelLibrary.request_update_cover()">
-                                <img id="edit-model-cover" src="" alt="封面预览">
+                                <img id="edit-model-cover" src="" alt="${this._t('resource.cover_preview_alt')}">
                                 <div class="cover-overlay skin-edit-cover-action">
-                                    <span><i class="ri-upload-2-line"></i> 上传新封面</span>
+                                    <span><i class="ri-upload-2-line"></i> ${this._t('resource.upload_cover')}</span>
                                 </div>
                             </div>
-                            <p class="skin-edit-cover-tip">建议不低于 640×360，最佳 1280×720；推荐 16:9 图片，支持 JPG/PNG/WebP。</p>
+                            <p class="skin-edit-cover-tip">${this._t('resource.cover_tip')}</p>
                             <div class="skin-rename-rule">
-                                <strong><i class="ri-information-line"></i> 文件夹命名规则</strong>
-                                <span>请勿包含特殊字符 \\ / : * ? " &lt; &gt; |</span>
-                                <span>修改原始文件夹名会同步修改本地文件夹名。</span>
+                                <strong><i class="ri-information-line"></i> ${this._t('resource.rename_rule_title')}</strong>
+                                <span>${this._escape_html(this._t('resource.rename_rule_invalid_chars'))}</span>
+                                <span>${this._t('resource.rename_rule_sync')}</span>
                             </div>
                         </div>
                         <div class="skin-edit-info-panel">
-                            <h2>编辑模型</h2>
-                            <p class="subtitle">修改显示名称与封面，让您的模型更容易被识别。</p>
-                            <div class="skin-edit-tags" aria-label="模型分类">
-                                <span class="tag-local"><i class="ri-archive-line"></i> 本地资源</span>
-                                <span class="tag-import"><i class="ri-upload-cloud-2-line"></i> 用户导入</span>
+                            <h2>${this._t('resource.edit_model_title')}</h2>
+                            <p class="subtitle">${this._t('resource.edit_model_subtitle')}</p>
+                            <div class="skin-edit-tags" aria-label="${this._t('resource.category_model')}">
+                                <span class="tag-local"><i class="ri-archive-line"></i> ${this._t('resource.local_resource')}</span>
+                                <span class="tag-import"><i class="ri-upload-cloud-2-line"></i> ${this._t('resource.user_imported')}</span>
                             </div>
                             <div class="edit-skin-form">
                                 <div class="form-group skin-edit-field">
-                                    <label>显示名称</label>
+                                    <label>${this._t('resource.display_name')}</label>
                                     <div class="skin-edit-input-wrap">
-                                        <input type="text" id="edit-model-display-name" maxlength="32" placeholder="请输入显示名称">
+                                        <input type="text" id="edit-model-display-name" maxlength="32" placeholder="${this._t('resource.display_name_placeholder')}">
                                         <span id="edit-model-display-count">0/32</span>
                                     </div>
                                 </div>
                                 <div class="form-group skin-edit-field">
-                                    <label>原始文件夹名</label>
-                                    <input type="text" id="edit-model-name" placeholder="请输入文件夹名称">
+                                    <label>${this._t('resource.original_folder_name')}</label>
+                                    <input type="text" id="edit-model-name" placeholder="${this._t('resource.folder_name_placeholder')}">
                                 </div>
                             </div>
                             <div class="modal-actions">
-                                <button class="btn secondary" onclick="app.closeModal('modal-edit-model')">取消</button>
+                                <button class="btn secondary" onclick="app.closeModal('modal-edit-model')">${this._t('common.cancel')}</button>
                                 <button class="btn primary" onclick="ModelLibrary.save_edit()">
-                                    <i class="ri-save-line"></i> 保存修改
+                                    <i class="ri-save-line"></i> ${this._t('resource.save_changes')}
                                 </button>
                             </div>
                         </div>
@@ -399,15 +399,15 @@ const ModelLibrary = {
         const display_name = String(document.getElementById('edit-model-display-name')?.value || '').trim();
         const new_name = document.getElementById('edit-model-name').value.trim();
         if (!display_name) {
-            app.showAlert('错误', '显示名称不能为空！', 'error');
+            app.showAlert(this._t('common.error'), this._t('resource.display_name_required'), 'error');
             return;
         }
         if (display_name.length > 32) {
-            app.showAlert('错误', '显示名称不能超过 32 个字符', 'error');
+            app.showAlert(this._t('common.error'), this._t('resource.display_name_too_long'), 'error');
             return;
         }
         if (!new_name) {
-            app.showAlert('错误', '原始文件夹名不能为空！', 'error');
+            app.showAlert(this._t('common.error'), this._t('resource.folder_name_required'), 'error');
             return;
         }
 
@@ -417,11 +417,11 @@ const ModelLibrary = {
                 if (res.success) {
                     this._current_edit_name = new_name;
                 } else {
-                    app.showAlert('失败', '重命名失败: ' + res.msg, 'error');
+                    app.showAlert(this._t('common.failure'), this._t('tools.rename_failed', { message: res.msg }), 'error');
                     return;
                 }
             } catch (e) {
-                app.showAlert('错误', '调用失败: ' + e, 'error');
+                app.showAlert(this._t('common.error'), this._t('common.call_failed', { message: e }), 'error');
                 return;
             }
         }
@@ -429,15 +429,15 @@ const ModelLibrary = {
         try {
             const display_res = await pywebview.api.set_resource_display_name('models', this._current_edit_name, display_name);
             if (!display_res || !display_res.success) {
-                app.showAlert('失败', (display_res && display_res.msg) ? display_res.msg : '显示名称保存失败', 'error');
+                app.showAlert(this._t('common.failure'), (display_res && display_res.msg) ? display_res.msg : this._t('resource.display_name_save_failed'), 'error');
                 return;
             }
         } catch (e) {
-            app.showAlert('错误', '调用失败: ' + e, 'error');
+            app.showAlert(this._t('common.error'), this._t('common.call_failed', { message: e }), 'error');
             return;
         }
 
-        app.showAlert('成功', '模型信息已保存！', 'success');
+        app.showAlert(this._t('common.success'), this._t('resource.model_info_saved'), 'success');
         app.closeModal('modal-edit-model');
         this.refresh_list();
     },
@@ -454,14 +454,14 @@ const ModelLibrary = {
             try {
                 const data_url = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.onerror = () => reject(new Error('读取图片失败'));
+                    reader.onerror = () => reject(new Error(this._t('common.read_image_failed')));
                     reader.onload = () => resolve(String(reader.result || ''));
                     reader.readAsDataURL(file);
                 });
                 app.openCropCoverModal(data_url);
             } catch (e) {
                 console.error(e);
-                app.showAlert('错误', '读取图片失败', 'error');
+                app.showAlert(this._t('common.error'), this._t('common.read_image_failed'), 'error');
             }
         };
         input.click();

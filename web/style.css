@@ -418,17 +418,14 @@ body {
 
 body.ai-disclaimer-open #app-root > .app-header,
 body.ai-disclaimer-open #app-root > .main-container,
-body.ai-disclaimer-open #app-root > #tooltip,
 body.ai-disclaimer-open #app-root > #btn-guide-help,
 body.ai-disclaimer-open #app-root > #btn-notification-bell,
 body.ai-chat-open #app-root > .app-header,
 body.ai-chat-open #app-root > .main-container,
-body.ai-chat-open #app-root > #tooltip,
 body.ai-chat-open #app-root > #btn-guide-help,
 body.ai-chat-open #app-root > #btn-notification-bell,
 body.overlay-performance-lock #app-root > .app-header,
 body.overlay-performance-lock #app-root > .main-container,
-body.overlay-performance-lock #app-root > #tooltip,
 body.overlay-performance-lock #app-root > #btn-guide-help,
 body.overlay-performance-lock #app-root > #btn-notification-bell {
     filter: blur(4px) saturate(0.96);
@@ -439,21 +436,18 @@ body.overlay-performance-lock #app-root > #btn-notification-bell {
 
 body.ai-disclaimer-open #app-root > .app-header *,
 body.ai-disclaimer-open #app-root > .main-container *,
-body.ai-disclaimer-open #app-root > #tooltip *,
 body.ai-disclaimer-open #app-root > #btn-guide-help,
 body.ai-disclaimer-open #app-root > #btn-guide-help *,
 body.ai-disclaimer-open #app-root > #btn-notification-bell,
 body.ai-disclaimer-open #app-root > #btn-notification-bell *,
 body.ai-chat-open #app-root > .app-header *,
 body.ai-chat-open #app-root > .main-container *,
-body.ai-chat-open #app-root > #tooltip *,
 body.ai-chat-open #app-root > #btn-guide-help,
 body.ai-chat-open #app-root > #btn-guide-help *,
 body.ai-chat-open #app-root > #btn-notification-bell,
 body.ai-chat-open #app-root > #btn-notification-bell *,
 body.overlay-performance-lock #app-root > .app-header *,
 body.overlay-performance-lock #app-root > .main-container *,
-body.overlay-performance-lock #app-root > #tooltip *,
 body.overlay-performance-lock #app-root > #btn-guide-help,
 body.overlay-performance-lock #app-root > #btn-guide-help *,
 body.overlay-performance-lock #app-root > #btn-notification-bell,
@@ -463,17 +457,14 @@ body.overlay-performance-lock #app-root > #btn-notification-bell * {
 
 body.ai-disclaimer-open #app-root > .app-header *,
 body.ai-disclaimer-open #app-root > .main-container *,
-body.ai-disclaimer-open #app-root > #tooltip *,
 body.ai-disclaimer-open #app-root > #btn-guide-help *,
 body.ai-disclaimer-open #app-root > #btn-notification-bell *,
 body.ai-chat-open #app-root > .app-header *,
 body.ai-chat-open #app-root > .main-container *,
-body.ai-chat-open #app-root > #tooltip *,
 body.ai-chat-open #app-root > #btn-guide-help *,
 body.ai-chat-open #app-root > #btn-notification-bell *,
 body.overlay-performance-lock #app-root > .app-header *,
 body.overlay-performance-lock #app-root > .main-container *,
-body.overlay-performance-lock #app-root > #tooltip *,
 body.overlay-performance-lock #app-root > #btn-guide-help *,
 body.overlay-performance-lock #app-root > #btn-notification-bell * {
     transition: none !important;
@@ -550,7 +541,6 @@ i[class^="ri-"] {
 /* Frameless 窗口拖拽区：头部可拖，交互控件必须 no-drag，避免点击被拖拽吞掉 */
 .app-header.pywebview-drag-region {
     -webkit-app-region: drag;
-    app-region: drag;
 }
 
 .header-nav,
@@ -563,7 +553,6 @@ i[class^="ri-"] {
 .header-right button,
 .header-right [onclick] {
     -webkit-app-region: no-drag;
-    app-region: no-drag;
 }
 
 /* 1. 左侧 Logo 区域 */
@@ -584,7 +573,6 @@ i[class^="ri-"] {
     border-radius: 6px;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
     -webkit-app-region: no-drag;
-    app-region: no-drag;
 }
 
 .app-brand-wrapper {
@@ -609,7 +597,10 @@ i[class^="ri-"] {
 .app-version-text {
     font-size: 0.7rem;
     font-weight: 600;
-    color: #F59E0B;
+    background: var(--brand-text-gradient, linear-gradient(135deg, var(--text-main) 0%, var(--text-sec) 100%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: var(--brand-text-fill, transparent);
 }
 
 /* 2. 中间导航菜单 */
@@ -1479,6 +1470,7 @@ i[class^="ri-"] {
     color: var(--notice-hero-text);
     line-height: 1.5;
     display: -webkit-box;
+    line-clamp: 2;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
@@ -2961,15 +2953,46 @@ i[class^="ri-"] {
     align-items: center;
     justify-content: center;
     z-index: 12000;
+    opacity: 0; /* 显式设置初始状态为透明，防止从 none 变为 flex 时发生瞬间黑屏闪现 */
 }
 
 .modal-overlay.show {
     display: flex;
-    animation: fadeIn 0.2s;
+    animation: fadeIn 0.24s ease-out forwards;
+}
+
+.modal-overlay.show .modal-content {
+    animation: modalContentShow 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-overlay.hiding {
-    animation: fadeOut 0.2s forwards;
+    animation: fadeOut 0.2s ease-in forwards;
+}
+
+.modal-overlay.hiding .modal-content {
+    animation: modalContentHide 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes modalContentShow {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes modalContentHide {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
 }
 
 @keyframes fadeOut {
@@ -6094,7 +6117,8 @@ i[class^="ri-"] {
 .mod-preview-cover {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    background: var(--bg-card);
     display: block;
 }
 
@@ -6444,8 +6468,9 @@ i[class^="ri-"] {
 
 /* 支持开发者弹窗样式 */
 .modal-content.author-works-modal {
-    width: min(700px, 94vw);
-    max-width: 94vw;
+    width: min(520px, calc(100vw - 64px));
+    min-width: 0;
+    max-width: none;
     max-height: 86vh;
     padding: 0;
     border-radius: 18px;
@@ -6453,6 +6478,7 @@ i[class^="ri-"] {
     text-align: left;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
+    justify-content: stretch;
 }
 
 .author-works-header {
@@ -6513,8 +6539,9 @@ i[class^="ri-"] {
 
 .author-works-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
+    width: 100%;
 }
 
 .author-work-card {
@@ -6562,6 +6589,7 @@ i[class^="ri-"] {
     line-height: 1.5;
     opacity: 0.95;
     display: -webkit-box;
+    line-clamp: 2;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;

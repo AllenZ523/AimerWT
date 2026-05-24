@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aimer WT</title>
     <link rel="stylesheet" href="assets/remixicon/remixicon.css">
-    <link rel="stylesheet" href="style.css?v=20260331_1">
+    <link rel="stylesheet" href="style.css?v=20260524_author_works">
     <link rel="stylesheet" href="css_fix.css?v=20260521_2">
     <link rel="stylesheet" href="css/notice_template_general.css?v=20260331_1">
     <link rel="stylesheet" href="css/notice_template_update.css?v=20260331_1">
@@ -61,7 +61,7 @@
             <img src="assets/logo.ico" class="app-logo" alt="Logo">
             <div class="app-brand-wrapper">
                 <span class="app-brand-text">Aimer WT</span>
-                <span class="app-version-text" style="color: #8B0000;" data-i18n="app.version">v3 内测</span>
+                <span class="app-version-text" data-i18n="app.version">v3 Beta</span>
             </div>
         </div>
 
@@ -90,7 +90,7 @@
         <!-- 3. 右侧工具栏 (主题切换 + 窗口控制) -->
         <div class="header-right">
             <!-- 主题切换 (月亮) -->
-            <button class="icon-btn theme-toggle" id="btn-theme" onclick="app.toggleTheme()" title="切换主题">
+                <button class="icon-btn theme-toggle" id="btn-theme" onclick="app.toggleTheme()" title="切换主题" data-i18n-title="header.toggle_theme">
                 <i class="ri-moon-line"></i>
             </button>
 
@@ -99,13 +99,13 @@
 
             <!-- 窗口控制按钮 -->
             <div class="window-controls">
-                <div class="win-btn bili-btn" onclick="app.openBiliSpace()" title="访问作者 B 站主页">
+                <div class="win-btn bili-btn" onclick="app.openBiliSpace()" title="访问作者 B 站主页" data-i18n-title="header.bili_home">
                     <i class="ri-bilibili-line"></i>
                 </div>
-                <div class="win-btn" onclick="app.openGitHubRepo()" title="访问项目 GitHub">
+                <div class="win-btn" onclick="app.openGitHubRepo()" title="访问项目 GitHub" data-i18n-title="header.github_repo">
                     <i class="ri-github-line"></i>
                 </div>
-                <div class="win-btn" id="btn-pin-title" onclick="app.togglePin()" title="置顶窗口">
+                <div class="win-btn" id="btn-pin-title" onclick="app.togglePin()" title="置顶窗口" data-i18n-title="header.pin_window">
                     <i class="ri-pushpin-line"></i>
                 </div>
                 <div class="win-btn" onclick="app.minimizeApp()">
@@ -342,8 +342,8 @@
                                 <div class="res-panel-card res-ops-card">
                                     <div class="res-panel-title"><i class="ri-dashboard-line"></i> <span data-i18n="resource.operation_panel">操作面板</span></div>
                                     <div class="res-ops-hint" id="skins-ops-hint">
-                                        <span id="skins-count">共0项</span><br>
-                                        <span id="skins-selected-hint">至少选择1个项目</span>
+                                        <span id="skins-count" data-i18n="resource.count_zero">共0项</span><br>
+                                        <span id="skins-selected-hint" data-i18n="resource.min_select_one">至少选择1个项目</span>
                                     </div>
                                     <div class="res-ops-actions res-ops-actions-four">
                                         <button id="skins-op-open" onclick="app.open_selected_resource_folder('skins')" title="打开" data-i18n-title="resource.action_open">
@@ -457,8 +457,8 @@
                                 <div class="res-panel-card res-ops-card">
                                     <div class="res-panel-title"><i class="ri-dashboard-line"></i> <span data-i18n="resource.operation_panel">操作面板</span></div>
                                     <div class="res-ops-hint" id="sights-ops-hint">
-                                        <span id="sights-count">共0项</span><br>
-                                        <span id="sights-selected-hint">至少选择1个项目</span>
+                                        <span id="sights-count" data-i18n="resource.count_zero">共0项</span><br>
+                                        <span id="sights-selected-hint" data-i18n="resource.min_select_one">至少选择1个项目</span>
                                     </div>
                                     <div class="res-ops-actions res-ops-actions-four">
                                         <button id="sights-op-open" onclick="app.open_selected_resource_folder('sights')" title="打开" data-i18n-title="resource.action_open">
@@ -565,8 +565,8 @@
                                 <div class="res-panel-card res-ops-card">
                                     <div class="res-panel-title"><i class="ri-dashboard-line"></i> <span data-i18n="resource.operation_panel">操作面板</span></div>
                                     <div class="res-ops-hint" id="tasks-ops-hint">
-                                        <span id="tasks-count">共0项</span><br>
-                                        <span id="tasks-selected-hint">至少选择1个项目</span>
+                                        <span id="tasks-count" data-i18n="resource.count_zero">共0项</span><br>
+                                        <span id="tasks-selected-hint" data-i18n="resource.min_select_one">至少选择1个项目</span>
                                     </div>
                                     <div class="res-ops-actions res-ops-actions-four">
                                         <button id="tasks-op-open" onclick="app.open_selected_resource_folder('tasks')" title="打开" data-i18n-title="resource.action_open">
@@ -681,8 +681,8 @@
                                 <div class="res-panel-card res-ops-card">
                                     <div class="res-panel-title"><i class="ri-dashboard-line"></i> <span data-i18n="resource.operation_panel">操作面板</span></div>
                                     <div class="res-ops-hint" id="models-ops-hint">
-                                        <span id="models-count">共0项</span><br>
-                                        <span id="models-selected-hint">至少选择1个项目</span>
+                                        <span id="models-count" data-i18n="resource.count_zero">共0项</span><br>
+                                        <span id="models-selected-hint" data-i18n="resource.min_select_one">至少选择1个项目</span>
                                     </div>
                                     <div class="res-ops-actions res-ops-actions-four">
                                         <button id="models-op-open" onclick="app.open_selected_resource_folder('models')" title="打开" data-i18n-title="resource.action_open">
@@ -800,8 +800,8 @@
                                 <div class="res-panel-card res-ops-card">
                                     <div class="res-panel-title"><i class="ri-dashboard-line"></i> <span data-i18n="resource.operation_panel">操作面板</span></div>
                                     <div class="res-ops-hint" id="hangar-ops-hint">
-                                        <span id="hangar-count">共0项</span><br>
-                                        <span id="hangar-selected-hint">至少选择1个项目</span>
+                                        <span id="hangar-count" data-i18n="resource.count_zero">共0项</span><br>
+                                        <span id="hangar-selected-hint" data-i18n="resource.min_select_one">至少选择1个项目</span>
                                     </div>
                                     <div class="res-ops-actions res-ops-actions-four">
                                         <button id="hangar-op-open" onclick="app.open_selected_resource_folder('hangar')" title="打开" data-i18n-title="resource.action_open">
@@ -868,8 +868,8 @@
                             <i class="ri-heart-3-line"></i>
                         </div>
                         <div class="stat-content">
-                            <div class="stat-label">支持我</div>
-                            <div class="stat-value">请我喝一杯蜜雪冰城</div>
+                            <div class="stat-label" data-i18n="info.support_me">支持我</div>
+                            <div class="stat-value" data-i18n="info.support_me_value">请我喝一杯蜜雪冰城</div>
                         </div>
                     </button>
                     <button class="stat-card stat-card-action" type="button"
@@ -878,7 +878,7 @@
                             <i class="ri-qq-line"></i>
                         </div>
                         <div class="stat-content">
-                            <div class="stat-label">加入群(讨论、反馈BUG)</div>
+                            <div class="stat-label" data-i18n="info.join_group">加入群(讨论、反馈BUG)</div>
                             <div class="stat-value">1078343629</div>
                         </div>
                     </button>
@@ -888,8 +888,8 @@
                             <i class="ri-file-text-line"></i>
                         </div>
                         <div class="stat-content">
-                            <div class="stat-label">使用文档</div>
-                            <div class="stat-value">飞书云文档</div>
+                            <div class="stat-label" data-i18n="info.docs">使用文档</div>
+                            <div class="stat-value" data-i18n="info.feishu_docs">飞书云文档</div>
                         </div>
                     </button>
                     <button class="stat-card stat-card-action" type="button"
@@ -898,7 +898,7 @@
                             <i class="ri-bilibili-line"></i>
                         </div>
                         <div class="stat-content">
-                            <div class="stat-label">我的B站主页</div>
+                            <div class="stat-label" data-i18n="info.my_bili">我的B站主页</div>
                             <div class="stat-value">AimerSo</div>
                         </div>
                     </button>
@@ -907,7 +907,7 @@
                 <!-- 快速链接区域 -->
                 <div class="quick-links-section">
                     <div class="section-header">
-                        <h2><i class="ri-links-line"></i> 快速链接</h2>
+                        <h2><i class="ri-links-line"></i> <span data-i18n="info.quick_links">快速链接</span></h2>
                         <span class="section-subtitle">Quick Access</span>
                     </div>
                     <div class="links-grid">
@@ -920,8 +920,8 @@
                                     <img src="assets/WT.webp" alt="WT">
                                 </div>
                                 <div class="link-info">
-                                    <div class="link-title">战争雷霆官网</div>
-                                    <div class="link-desc">游戏官方网站</div>
+                                    <div class="link-title" data-i18n="info.wt_official">战争雷霆官网</div>
+                                    <div class="link-desc" data-i18n="info.game_official">游戏官方网站</div>
                                     <div class="link-url">https://warthunder.com/zh/</div>
                                 </div>
                                 <div class="link-arrow">
@@ -940,8 +940,8 @@
                                 </div>
                                 <div class="link-info">
                                     <div class="link-title">WTLive/WTLiker</div>
-                                    <div class="link-desc">MOD 创意工坊</div>
-                                    <div class="link-url">点击选择：WTLive(国际) / WTLiker(国内)</div>
+                                    <div class="link-desc" data-i18n="info.mod_workshop">MOD 创意工坊</div>
+                                    <div class="link-url" data-i18n="info.choose_workshop">点击选择：WTLive(国际) / WTLiker(国内)</div>
                                 </div>
                                 <div class="link-arrow">
                                     <i class="ri-arrow-right-line"></i>
@@ -958,8 +958,8 @@
                                     <i class="ri-bilibili-line"></i>
                                 </div>
                                 <div class="link-info">
-                                    <div class="link-title">哔哩哔哩</div>
-                                    <div class="link-desc">战争雷霆官方账号</div>
+                                    <div class="link-title" data-i18n="info.wt_bili">哔哩哔哩</div>
+                                    <div class="link-desc" data-i18n="info.wt_bili_desc">战争雷霆官方账号</div>
                                     <div class="link-url">https://b23.tv/Z7Hg9md</div>
                                 </div>
                                 <div class="link-arrow">
@@ -978,7 +978,7 @@
                                 </div>
                                 <div class="link-info">
                                     <div class="link-title">GitHub</div>
-                                    <div class="link-desc">本项目的开源代码托管地址</div>
+                                    <div class="link-desc" data-i18n="info.github_desc">本项目的开源代码托管地址</div>
                                     <div class="link-url">https://github.com/AimerSo/Aimer_WT</div>
                                 </div>
                                 <div class="link-arrow">
@@ -994,8 +994,8 @@
                 <div class="about-section">
                     <div class="card about-card">
                         <div class="card-header">
-                            <h2><i class="ri-heart-line"></i> 鸣谢名单</h2>
-                            <span class="subtitle">排名不分先后</span>
+                            <h2><i class="ri-heart-line"></i> <span data-i18n="info.thanks">鸣谢名单</span></h2>
+                            <span class="subtitle" data-i18n="info.thanks_subtitle">排名不分先后</span>
                         </div>
                         <div class="card-content">
                             <div class="contributors-grid">
@@ -1006,7 +1006,7 @@
                                     </div>
                                     <div>
                                         <div class="contributor-name">beiku贝库</div>
-                                        <div class="contributor-role">测试、音效、涂装等技术支持</div>
+                                        <div class="contributor-role" data-i18n="info.role_test_sound_skin">测试、音效、涂装等技术支持</div>
                                     </div>
                                 </a>
                                 <a class="contributor-card" href="https://b23.tv/NV7ZSAr"
@@ -1016,7 +1016,7 @@
                                     </div>
                                     <div>
                                         <div class="contributor-name">赤风RED</div>
-                                        <div class="contributor-role">音效技术支持</div>
+                                        <div class="contributor-role" data-i18n="info.role_sound_support">音效技术支持</div>
                                     </div>
                                 </a>
                                 <a class="contributor-card" href="https://b23.tv/HoVOnla"
@@ -1026,7 +1026,7 @@
                                     </div>
                                     <div>
                                         <div class="contributor-name">连樱Ceciliawillet</div>
-                                        <div class="contributor-role">音效技术支持</div>
+                                        <div class="contributor-role" data-i18n="info.role_sound_support">音效技术支持</div>
                                     </div>
                                 </a>
                                 <a class="contributor-card" href="https://b23.tv/h3rAHbw"
@@ -1036,7 +1036,7 @@
                                     </div>
                                     <div>
                                         <div class="contributor-name">莱茵汉斯喵Channel</div>
-                                        <div class="contributor-role">涂装技术支持</div>
+                                        <div class="contributor-role" data-i18n="info.role_skin_support">涂装技术支持</div>
                                     </div>
                                 </a>
                                 <a class="contributor-card" href="https://github.com/Findoutsider"
@@ -1046,7 +1046,7 @@
                                     </div>
                                     <div>
                                         <div class="contributor-name">彼岸 [服务器维护]</div>
-                                        <div class="contributor-role">软件、服务器技术支持</div>
+                                        <div class="contributor-role" data-i18n="info.role_software_server">软件、服务器技术支持</div>
                                     </div>
                                 </a>
                                 <a class="contributor-card" href="#"
@@ -1056,7 +1056,7 @@
                                     </div>
                                     <div>
                                         <div class="contributor-name">TNT569</div>
-                                        <div class="contributor-role">软件技术支持</div>
+                                        <div class="contributor-role" data-i18n="info.role_software_support">软件技术支持</div>
                                     </div>
                                 </a>
                                 <a class="contributor-card" href="#"
@@ -1066,7 +1066,7 @@
                                     </div>
                                     <div>
                                         <div class="contributor-name">Badwolf_TW</div>
-                                        <div class="contributor-role">软件技术支持</div>
+                                        <div class="contributor-role" data-i18n="info.role_software_support">软件技术支持</div>
                                     </div>
                                 </a>
 
@@ -1076,7 +1076,7 @@
 
                     <div class="card project-card">
                         <div class="card-header">
-                            <h2><i class="ri-information-line"></i> 项目信息</h2>
+                            <h2><i class="ri-information-line"></i> <span data-i18n="info.project_info">项目信息</span></h2>
                             <span class="subtitle">Project Information</span>
                         </div>
                         <div class="card-content">
@@ -1086,7 +1086,7 @@
                                         <i class="ri-code-box-line"></i>
                                     </div>
                                     <div class="info-details">
-                                        <div class="info-title">开源协议</div>
+                                        <div class="info-title" data-i18n="info.license">开源协议</div>
                                         <div class="info-value">GNU General Public License v3.0</div>
                                     </div>
                                 </div>
@@ -1095,7 +1095,7 @@
                                         <i class="ri-terminal-box-line"></i>
                                     </div>
                                     <div class="info-details">
-                                        <div class="info-title">技术栈</div>
+                                        <div class="info-title" data-i18n="info.tech_stack">技术栈</div>
                                         <div class="info-value">Python 3.11 + Flask + HTML/CSS/JS</div>
                                     </div>
                                 </div>
@@ -1104,8 +1104,8 @@
                                         <i class="ri-calendar-line"></i>
                                     </div>
                                     <div class="info-details">
-                                        <div class="info-title">最后更新</div>
-                                        <div class="info-value" id="project-last-update">2026 年 3 月 11 日</div>
+                                        <div class="info-title" data-i18n="info.last_update">最后更新</div>
+                                        <div class="info-value" id="project-last-update" data-i18n="info.last_update_value">2026 年 3 月 11 日</div>
                                     </div>
                                 </div>
                                 <div class="project-info-item">
@@ -1113,9 +1113,9 @@
                                         <i class="ri-shield-check-line"></i>
                                     </div>
                                     <div class="info-details">
-                                        <div class="info-title">状态</div>
+                                        <div class="info-title" data-i18n="info.status">状态</div>
                                         <div class="info-value">
-                                            <span class="status-badge active" id="project-status-badge">活跃开发中</span>
+                                            <span class="status-badge active" id="project-status-badge" data-i18n="info.active_development">活跃开发中</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1138,7 +1138,7 @@
                     <div class="up-panel up-panel-left">
                         <!-- 头像区 -->
                         <div class="up-avatar-area">
-                            <div class="up-avatar-wrap" id="up-avatar-wrap" title="点击更换头像（需达到1级）">
+                            <div class="up-avatar-wrap" id="up-avatar-wrap" title="点击更换头像（需达到1级）" data-i18n-title="profile.avatar_change_title">
                                 <div class="up-avatar" id="up-avatar">
                                     <i class="ri-user-line"></i>
                                 </div>
@@ -1152,7 +1152,7 @@
                         <div class="up-info-block">
                             <div class="up-nickname-row">
                                 <input class="up-nickname-input" id="up-nickname-input"
-                                    type="text" maxlength="18" placeholder="设置昵称（需达到1级）">
+                                    type="text" maxlength="18" placeholder="设置昵称（需达到1级）" data-i18n-placeholder="profile.nickname_placeholder">
                                 <button class="up-save-btn" id="up-save-btn" onclick="userProfile.saveNickname()">
                                     <i class="ri-check-line"></i>
                                 </button>
@@ -1172,8 +1172,8 @@
                             <!-- 0级锁定提示 -->
                             <div class="up-locked-tip" id="up-locked-tip" style="display:none;">
                                 <i class="ri-lock-2-line"></i>
-                                <span>身份验证后解锁编辑权限</span>
-                                <button class="up-verify-btn" id="up-verify-btn" type="button" onclick="userProfile.showVerifyDialog()">请求认证</button>
+                                <span data-i18n="profile.unlock_after_verify">身份验证后解锁编辑权限</span>
+                                <button class="up-verify-btn" id="up-verify-btn" type="button" onclick="userProfile.showVerifyDialog()" data-i18n="profile.request_verify">请求认证</button>
                             </div>
                         </div>
                     </div>
@@ -1183,9 +1183,9 @@
 
                     <!-- 右侧：勋章展示区 -->
                     <div class="up-panel up-panel-right">
-                        <div class="up-section-label"><i class="ri-medal-2-line"></i> 我的勋章</div>
+                        <div class="up-section-label"><i class="ri-medal-2-line"></i> <span data-i18n="profile.my_badges">我的勋章</span></div>
                         <div class="up-badges" id="up-badges">
-                            <span class="up-badge-placeholder">暂无勋章</span>
+                            <span class="up-badge-placeholder" data-i18n="profile.no_badges">暂无勋章</span>
                         </div>
                     </div>
                 </div>
@@ -1193,12 +1193,12 @@
 
             <div class="card">
                 <div class="card-header">
-                    <h2>资源管理</h2>
+                    <h2 data-i18n="settings.resource_management">资源管理</h2>
                 </div>
                 <div class="settings-grid">
                     <button class="btn big-btn secondary" onclick="app.openFolder('pending')">
                         <i class="ri-folder-download-line"></i>
-                        打开待解压区
+                        <span data-i18n="settings.open_pending">打开待解压区</span>
                     </button>
                     <button class="btn big-btn secondary" onclick="app.openFolder('library')">
                         <i class="ri-folder-2-line"></i>
@@ -1250,6 +1250,8 @@
                                 <div class="custom-select-option selected" data-value="zh_cn" onclick="app.selectLanguage('zh_cn')">简体中文</div>
                                 <div class="custom-select-option" data-value="zh_tw" onclick="app.selectLanguage('zh_tw')">繁體中文</div>
                                 <div class="custom-select-option" data-value="en_us" onclick="app.selectLanguage('en_us')">English</div>
+                                <div class="custom-select-option" data-value="ru_ru" onclick="app.selectLanguage('ru_ru')">Русский</div>
+                                <div class="custom-select-option" data-value="de_de" onclick="app.selectLanguage('de_de')">Deutsch</div>
                             </div>
                         </div>
 
@@ -1328,15 +1330,15 @@
             <div class="settings-split-row">
                 <div class="card" id="cdk-redeem-card">
                     <div class="card-header">
-                        <h2>CDK兑换</h2>
+                        <h2 data-i18n="settings.cdk_redeem">CDK兑换</h2>
                         <span class="subtitle">Redeem Code</span>
                     </div>
                     <div style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
                         <p style="font-size: 12px; color: var(--text-sec); margin: 0;">
-                            输入兑换码解锁主题或其他内容
+                            <span data-i18n="settings.cdk_redeem_desc">输入兑换码解锁主题或其他内容</span>
                         </p>
                         <button class="btn feedback-outline full-width" onclick="app.openRedeemCodeModal()" style="width: 100%;">
-                            <i class="ri-gift-line"></i> CDK兑换
+                            <i class="ri-gift-line"></i> <span data-i18n="settings.cdk_redeem">CDK兑换</span>
                         </button>
                     </div>
                 </div>
@@ -1376,16 +1378,16 @@
 
                 <div class="card" id="feedback-card">
                     <div class="card-header">
-                        <h2>反馈</h2>
+                        <h2 data-i18n="feedback.title">反馈</h2>
                         <span class="subtitle">Feedback</span>
                     </div>
                     <div style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
                         <p style="font-size: 12px; color: var(--text-sec); margin: 0;">
-                            BUG反馈，功能建议
+                            <span data-i18n="settings.feedback_desc">BUG反馈，功能建议</span>
                         </p>
                         <button class="btn feedback-outline full-width" id="btn-feedback"
                             onclick="app.openFeedbackModal()" style="width: 100%;">
-                            <i class="ri-feedback-line"></i> 打开反馈
+                            <i class="ri-feedback-line"></i> <span data-i18n="feedback.open">打开反馈</span>
                         </button>
                     </div>
                 </div>
@@ -1405,25 +1407,25 @@
                     <div class="path-field">
                         <label class="path-label">
                             <i class="ri-folder-zip-line"></i>
-                            待解压区路径
-                            <span class="path-label-hint">(存放待导入的压缩包)</span>
+                            <span data-i18n="settings.pending_path">待解压区路径</span>
+                            <span class="path-label-hint" data-i18n="settings.pending_path_hint">(存放待导入的压缩包)</span>
                         </label>
                         <div class="path-input-row">
                             <div class="path-input-wrapper">
                                 <input type="text" id="pending-dir-input" class="path-input" readonly
                                     placeholder="使用默认路径" data-i18n-placeholder="settings.use_default_path">
                                 <button class="path-copy-btn" onclick="app.copyPathToClipboard('pending-dir-input')"
-                                    title="复制路径">
+                                    title="复制路径" data-i18n-title="settings.copy_path_title">
                                     <i class="ri-file-copy-line"></i>
                                 </button>
                             </div>
-                            <button class="btn secondary" onclick="app.browsePendingDir()" title="选择自定义路径">
+                            <button class="btn secondary" onclick="app.browsePendingDir()" title="选择自定义路径" data-i18n-title="settings.choose_custom_path_title">
                                 <i class="ri-folder-add-line"></i>
                             </button>
-                            <button class="btn secondary" onclick="app.openPendingFolder()" title="打开文件夹">
+                            <button class="btn secondary" onclick="app.openPendingFolder()" title="打开文件夹" data-i18n-title="settings.open_folder_title">
                                 <i class="ri-folder-open-line"></i>
                             </button>
-                            <button class="btn secondary" onclick="app.resetPendingDir()" title="重置为默认">
+                            <button class="btn secondary" onclick="app.resetPendingDir()" title="重置为默认" data-i18n-title="settings.reset_default_title">
                                 <i class="ri-refresh-line"></i>
                             </button>
                         </div>
@@ -1433,25 +1435,25 @@
                     <div class="path-field">
                         <label class="path-label">
                             <i class="ri-folder-music-line"></i>
-                            语音包库路径
-                            <span class="path-label-hint">(存放已解压的语音包)</span>
+                            <span data-i18n="settings.voice_library_path">语音包库路径</span>
+                            <span class="path-label-hint" data-i18n="settings.library_path_hint">(存放已解压的语音包)</span>
                         </label>
                         <div class="path-input-row">
                             <div class="path-input-wrapper">
                                 <input type="text" id="library-dir-input" class="path-input" readonly
                                     placeholder="使用默认路径" data-i18n-placeholder="settings.use_default_path">
                                 <button class="path-copy-btn" onclick="app.copyPathToClipboard('library-dir-input')"
-                                    title="复制路径">
+                                    title="复制路径" data-i18n-title="settings.copy_path_title">
                                     <i class="ri-file-copy-line"></i>
                                 </button>
                             </div>
-                            <button class="btn secondary" onclick="app.browseLibraryDir()" title="选择自定义路径">
+                            <button class="btn secondary" onclick="app.browseLibraryDir()" title="选择自定义路径" data-i18n-title="settings.choose_custom_path_title">
                                 <i class="ri-folder-add-line"></i>
                             </button>
-                            <button class="btn secondary" onclick="app.openLibraryFolder()" title="打开文件夹">
+                            <button class="btn secondary" onclick="app.openLibraryFolder()" title="打开文件夹" data-i18n-title="settings.open_folder_title">
                                 <i class="ri-folder-open-line"></i>
                             </button>
-                            <button class="btn secondary" onclick="app.resetLibraryDir()" title="重置为默认">
+                            <button class="btn secondary" onclick="app.resetLibraryDir()" title="重置为默认" data-i18n-title="settings.reset_default_title">
                                 <i class="ri-refresh-line"></i>
                             </button>
                         </div>
@@ -1459,7 +1461,7 @@
 
                     <p class="path-hint">
                         <i class="ri-information-line"></i>
-                        选择自定义路径后将自动保存并立即生效，已存在的文件不会自动迁移
+                        <span data-i18n="settings.custom_path_notice">选择自定义路径后将自动保存并立即生效，已存在的文件不会自动迁移</span>
                     </p>
                 </div>
             </div>
@@ -1469,16 +1471,16 @@
 
     <div class="modal-overlay" id="modal-install">
         <div class="modal-content">
-            <h2>选择要加载的模块</h2>
-            <p class="subtitle" style="margin-bottom: 10px;">已根据文件自动检测可用模块</p>
+            <h2 data-i18n="modal.install_title">选择要加载的模块</h2>
+            <p class="subtitle" style="margin-bottom: 10px;" data-i18n="modal.install_subtitle">已根据文件自动检测可用模块</p>
 
             <div class="toggle-grid" id="install-toggles">
             </div>
 
             <div class="modal-actions">
-                <button class="btn secondary" onclick="app.closeModal('modal-install')">取消</button>
+                <button class="btn secondary" onclick="app.closeModal('modal-install')" data-i18n="common.cancel">取消</button>
                 <button class="btn primary" id="btn-confirm-install">
-                    <i class="ri-rocket-line"></i> 立即加载
+                    <i class="ri-rocket-line"></i> <span data-i18n="modal.install_now">立即加载</span>
                 </button>
             </div>
         </div>
@@ -1502,7 +1504,7 @@
     <div class="modal-overlay" id="modal-redeem-code">
         <div class="modal-content redeem-modal">
             <!-- 关闭按钮 -->
-            <button class="redeem-modal-close" onclick="app.closeModal('modal-redeem-code')" aria-label="关闭">
+            <button class="redeem-modal-close" onclick="app.closeModal('modal-redeem-code')" aria-label="关闭" data-i18n-aria-label="common.close">
                 <i class="ri-close-line"></i>
             </button>
 
@@ -1514,27 +1516,27 @@
             </div>
 
             <!-- 标题与说明 -->
-            <h2 class="redeem-title">兑换中心</h2>
-            <p class="redeem-desc">输入口令或兑换码，解锁专属内容</p>
+            <h2 class="redeem-title" data-i18n="modal.redeem_title">兑换中心</h2>
+            <p class="redeem-desc" data-i18n="modal.redeem_desc">输入口令或兑换码，解锁专属内容</p>
 
             <!-- 输入区域 -->
             <div class="redeem-input-group">
                 <div class="redeem-input-wrapper">
                     <i class="ri-key-2-line redeem-input-icon"></i>
                     <input type="text" id="redeem-code-input" class="redeem-input"
-                        placeholder="请输入兑换码" autocomplete="off" spellcheck="false">
+                        placeholder="请输入兑换码" data-i18n-placeholder="modal.redeem_placeholder" autocomplete="off" spellcheck="false">
                 </div>
             </div>
 
             <!-- 操作按钮 -->
             <button class="btn primary redeem-submit-btn" onclick="app.submitRedeemCode()">
-                <i class="ri-arrow-right-line"></i> 立即兑换
+                <i class="ri-arrow-right-line"></i> <span data-i18n="modal.redeem_now">立即兑换</span>
             </button>
 
             <!-- 底部链接 -->
             <div class="redeem-footer">
                 <button class="redeem-footer-link" onclick="app.resetUnlockedThemes()">
-                    <i class="ri-refresh-line"></i> 重置已解锁主题
+                    <i class="ri-refresh-line"></i> <span data-i18n="modal.reset_unlocked_themes">重置已解锁主题</span>
                 </button>
             </div>
         </div>
@@ -1543,7 +1545,7 @@
     <!-- 关闭确认弹窗 -->
     <div class="modal-overlay" id="modal-close-confirm">
         <div class="modal-content close-confirm-modal">
-            <button class="close-confirm-x" onclick="app.handleCloseAction('cancel')" aria-label="关闭弹窗">
+            <button class="close-confirm-x" onclick="app.handleCloseAction('cancel')" aria-label="关闭弹窗" data-i18n-aria-label="common.close">
                 <i class="ri-close-line"></i>
             </button>
 
@@ -1586,39 +1588,39 @@
 
     <div class="modal-overlay" id="modal-feedback">
         <div class="modal-content">
-            <h2 style="margin-top: 0; color: var(--text-main);">反馈</h2>
+            <h2 style="margin-top: 0; color: var(--text-main);" data-i18n="feedback.title">反馈</h2>
             <div class="form-group" style="margin-top: 15px;">
-                <label>反馈类型</label>
+                <label data-i18n="feedback.type_label">反馈类型</label>
                 <div style="display: flex; gap: 8px; margin-top: 6px;">
                     <label class="feedback-type-option selected" data-value="bug">
                         <input type="radio" name="feedback-category" value="bug" checked style="display:none;">
-                        <i class="ri-bug-line"></i> BUG反馈
+                        <i class="ri-bug-line"></i> <span data-i18n="feedback.type_bug">BUG反馈</span>
                     </label>
                     <label class="feedback-type-option" data-value="suggestion">
                         <input type="radio" name="feedback-category" value="suggestion" style="display:none;">
-                        <i class="ri-lightbulb-line"></i> 功能建议
+                        <i class="ri-lightbulb-line"></i> <span data-i18n="feedback.type_feature">功能建议</span>
                     </label>
                     <label class="feedback-type-option" data-value="other">
                         <input type="radio" name="feedback-category" value="other" style="display:none;">
-                        <i class="ri-chat-3-line"></i> 其他
+                        <i class="ri-chat-3-line"></i> <span data-i18n="feedback.type_other">其他</span>
                     </label>
                 </div>
             </div>
             <div class="form-group" style="margin-top: 15px;">
-                <label>联系方式</label>
-                <input type="text" id="feedback-contact" maxlength="40" placeholder="QQ 或邮箱（选填）">
+                <label data-i18n="feedback.contact_label">联系方式</label>
+                <input type="text" id="feedback-contact" maxlength="40" placeholder="QQ 或邮箱（选填）" data-i18n-placeholder="feedback.contact_placeholder">
                 <div class="input-hint" id="feedback-contact-count">0/40</div>
             </div>
             <div class="form-group" style="margin-top: 15px;">
-                <label>反馈内容</label>
+                <label data-i18n="feedback.content_label">反馈内容</label>
                 <textarea id="feedback-content" class="feedback-textarea" maxlength="200"
-                    placeholder="请输入你的建议或遇到的问题"></textarea>
+                    placeholder="请输入你的建议或遇到的问题" data-i18n-placeholder="feedback.content_placeholder"></textarea>
                 <div class="input-hint" id="feedback-content-count">0/200</div>
             </div>
             <div class="modal-actions" style="justify-content: flex-end; gap: 12px; margin-top: 18px;">
-                <button class="btn secondary" onclick="app.closeModal('modal-feedback')">取消</button>
+                <button class="btn secondary" onclick="app.closeModal('modal-feedback')" data-i18n="common.cancel">取消</button>
                 <button class="btn primary" id="btn-submit-feedback" onclick="app.submitFeedback()">
-                    <i class="ri-send-plane-line"></i> 提交
+                    <i class="ri-send-plane-line"></i> <span data-i18n="feedback.submit">提交</span>
                 </button>
             </div>
         </div>
@@ -1679,25 +1681,25 @@
 
     <div class="modal-overlay" id="modal-copy-country">
         <div class="modal-content" style="max-width: 440px;">
-            <h2 id="copy-country-title">复制国籍文件</h2>
-            <p class="subtitle">输入国家缩写，新增对应国籍文件</p>
+            <h2 id="copy-country-title" data-i18n="copy_country.title">复制国籍文件</h2>
+            <p class="subtitle" data-i18n="copy_country.subtitle">输入国家缩写，新增对应国籍文件</p>
 
             <div class="form-group" style="margin-top: 15px;">
-                <label>国家缩写</label>
-                <input type="text" id="copy-country-code" placeholder="例如 jp / us">
+                <label data-i18n="copy_country.code_label">国家缩写</label>
+                <input type="text" id="copy-country-code" placeholder="例如 jp / us" data-i18n-placeholder="copy_country.code_placeholder">
                 <p class="input-hint">
-                    <i class="ri-information-line"></i> 仅支持 2-10 位英文字母
+                    <i class="ri-information-line"></i> <span data-i18n="copy_country.code_hint">仅支持 2-10 位英文字母</span>
                 </p>
             </div>
 
             <div class="modal-actions" style="justify-content: space-between;">
-                <button class="btn secondary" onclick="app.closeModal('modal-copy-country')">取消</button>
+                <button class="btn secondary" onclick="app.closeModal('modal-copy-country')" data-i18n="common.cancel">取消</button>
                 <div style="display:flex; gap:12px;">
                     <button class="btn primary" onclick="app.confirmCopyCountryFiles('ground')">
-                        <i class="ri-file-copy-line"></i> 复制陆战车组
+                        <i class="ri-file-copy-line"></i> <span data-i18n="copy_country.copy_ground">复制陆战车组</span>
                     </button>
                     <button class="btn primary" onclick="app.confirmCopyCountryFiles('radio')">
-                        <i class="ri-file-copy-line"></i> 复制无线电
+                        <i class="ri-file-copy-line"></i> <span data-i18n="copy_country.copy_radio">复制无线电</span>
                     </button>
                 </div>
             </div>
@@ -1710,48 +1712,48 @@
             <div class="skin-edit-layout">
                 <div class="skin-edit-preview-panel">
                     <div class="skin-cover-edit skin-edit-cover" onclick="app.requestUpdateSkinCover()">
-                        <img id="edit-skin-cover" src="" alt="封面预览">
+                        <img id="edit-skin-cover" src="" alt="封面预览" data-i18n-alt="resource.cover_preview_alt">
                         <div class="cover-overlay skin-edit-cover-action">
-                            <span><i class="ri-upload-2-line"></i> 上传新封面</span>
+                            <span><i class="ri-upload-2-line"></i> <span data-i18n="resource.upload_cover">上传新封面</span></span>
                         </div>
                     </div>
-                    <p class="skin-edit-cover-tip">建议不低于 640×360，最佳 1280×720；推荐 16:9 图片，支持 JPG/PNG/WebP。</p>
+                    <p class="skin-edit-cover-tip" data-i18n="resource.cover_tip">建议不低于 640×360，最佳 1280×720；推荐 16:9 图片，支持 JPG/PNG/WebP。</p>
 
                     <div class="skin-rename-rule">
-                        <strong><i class="ri-information-line"></i> 文件夹命名规则</strong>
-                        <span>请勿包含特殊字符 \ / : * ? " &lt; &gt; |</span>
-                        <span>修改原始文件夹名会同步修改本地文件夹名。</span>
+                        <strong><i class="ri-information-line"></i> <span data-i18n="resource.rename_rule_title">文件夹命名规则</span></strong>
+                        <span data-i18n="resource.rename_rule_invalid_chars">请勿包含特殊字符 \ / : * ? " &lt; &gt; |</span>
+                        <span data-i18n="resource.rename_rule_sync">修改原始文件夹名会同步修改本地文件夹名。</span>
                     </div>
                 </div>
 
                 <div class="skin-edit-info-panel">
-                    <h2>编辑封面和信息</h2>
-                    <p class="subtitle">修改显示名称与封面，让您的涂装更容易被识别。</p>
+                    <h2 data-i18n="resource.edit_skin_title">编辑封面和信息</h2>
+                    <p class="subtitle" data-i18n="resource.edit_skin_subtitle">修改显示名称与封面，让您的涂装更容易被识别。</p>
 
-                    <div class="skin-edit-tags" aria-label="涂装分类">
-                        <span class="tag-local"><i class="ri-archive-line"></i> 本地资源</span>
-                        <span class="tag-import"><i class="ri-upload-cloud-2-line"></i> 用户导入</span>
+                    <div class="skin-edit-tags" aria-label="涂装分类" data-i18n-title="resource.category_skin">
+                        <span class="tag-local"><i class="ri-archive-line"></i> <span data-i18n="resource.local_resource">本地资源</span></span>
+                        <span class="tag-import"><i class="ri-upload-cloud-2-line"></i> <span data-i18n="resource.user_imported">用户导入</span></span>
                     </div>
 
                     <div class="edit-skin-form">
                         <div class="form-group skin-edit-field">
-                            <label>显示名称</label>
+                            <label data-i18n="resource.display_name">显示名称</label>
                             <div class="skin-edit-input-wrap">
-                                <input type="text" id="edit-skin-display-name" maxlength="32" placeholder="请输入显示名称">
+                                <input type="text" id="edit-skin-display-name" maxlength="32" placeholder="请输入显示名称" data-i18n-placeholder="resource.display_name_placeholder">
                                 <span id="edit-skin-display-count">0/32</span>
                             </div>
                         </div>
 
                         <div class="form-group skin-edit-field">
-                            <label>原始文件夹名</label>
-                            <input type="text" id="edit-skin-name" placeholder="请输入文件夹名称">
+                            <label data-i18n="resource.original_folder_name">原始文件夹名</label>
+                            <input type="text" id="edit-skin-name" placeholder="请输入文件夹名称" data-i18n-placeholder="resource.folder_name_placeholder">
                         </div>
                     </div>
 
                     <div class="modal-actions">
-                        <button class="btn secondary" onclick="app.closeModal('modal-edit-skin')">取消</button>
+                        <button class="btn secondary" onclick="app.closeModal('modal-edit-skin')" data-i18n="common.cancel">取消</button>
                         <button class="btn primary" onclick="app.saveSkinEdit()">
-                            <i class="ri-save-line"></i> 保存修改
+                            <i class="ri-save-line"></i> <span data-i18n="resource.save_changes">保存修改</span>
                         </button>
                     </div>
                 </div>
@@ -1764,48 +1766,48 @@
             <div class="skin-edit-layout">
                 <div class="skin-edit-preview-panel">
                     <div class="skin-cover-edit skin-edit-cover" onclick="app.requestUpdateSightCover()">
-                        <img id="edit-sight-cover" src="" alt="封面预览">
+                        <img id="edit-sight-cover" src="" alt="封面预览" data-i18n-alt="resource.cover_preview_alt">
                         <div class="cover-overlay skin-edit-cover-action">
-                            <span><i class="ri-upload-2-line"></i> 上传新封面</span>
+                            <span><i class="ri-upload-2-line"></i> <span data-i18n="resource.upload_cover">上传新封面</span></span>
                         </div>
                     </div>
-                    <p class="skin-edit-cover-tip">建议不低于 640×360，最佳 1280×720；推荐 16:9 图片，支持 JPG/PNG/WebP。</p>
+                    <p class="skin-edit-cover-tip" data-i18n="resource.cover_tip">建议不低于 640×360，最佳 1280×720；推荐 16:9 图片，支持 JPG/PNG/WebP。</p>
 
                     <div class="skin-rename-rule">
-                        <strong><i class="ri-information-line"></i> 文件夹命名规则</strong>
-                        <span>请勿包含特殊字符 \ / : * ? " &lt; &gt; |</span>
-                        <span>修改原始文件夹名会同步修改本地文件夹名。</span>
+                        <strong><i class="ri-information-line"></i> <span data-i18n="resource.rename_rule_title">文件夹命名规则</span></strong>
+                        <span data-i18n="resource.rename_rule_invalid_chars">请勿包含特殊字符 \ / : * ? " &lt; &gt; |</span>
+                        <span data-i18n="resource.rename_rule_sync">修改原始文件夹名会同步修改本地文件夹名。</span>
                     </div>
                 </div>
 
                 <div class="skin-edit-info-panel">
-                    <h2>编辑炮镜</h2>
-                    <p class="subtitle">修改显示名称与封面，让您的炮镜更容易被识别。</p>
+                    <h2 data-i18n="resource.edit_sight_title">编辑炮镜</h2>
+                    <p class="subtitle" data-i18n="resource.edit_sight_subtitle">修改显示名称与封面，让您的炮镜更容易被识别。</p>
 
-                    <div class="skin-edit-tags" aria-label="炮镜分类">
-                        <span class="tag-local"><i class="ri-archive-line"></i> 本地资源</span>
-                        <span class="tag-import"><i class="ri-upload-cloud-2-line"></i> 用户导入</span>
+                    <div class="skin-edit-tags" aria-label="炮镜分类" data-i18n-title="resource.category_sight">
+                        <span class="tag-local"><i class="ri-archive-line"></i> <span data-i18n="resource.local_resource">本地资源</span></span>
+                        <span class="tag-import"><i class="ri-upload-cloud-2-line"></i> <span data-i18n="resource.user_imported">用户导入</span></span>
                     </div>
 
                     <div class="edit-skin-form">
                         <div class="form-group skin-edit-field">
-                            <label>显示名称</label>
+                            <label data-i18n="resource.display_name">显示名称</label>
                             <div class="skin-edit-input-wrap">
-                                <input type="text" id="edit-sight-display-name" maxlength="32" placeholder="请输入显示名称">
+                                <input type="text" id="edit-sight-display-name" maxlength="32" placeholder="请输入显示名称" data-i18n-placeholder="resource.display_name_placeholder">
                                 <span id="edit-sight-display-count">0/32</span>
                             </div>
                         </div>
 
                         <div class="form-group skin-edit-field">
-                            <label>原始文件夹名</label>
-                            <input type="text" id="edit-sight-name" placeholder="请输入文件夹名称">
+                            <label data-i18n="resource.original_folder_name">原始文件夹名</label>
+                            <input type="text" id="edit-sight-name" placeholder="请输入文件夹名称" data-i18n-placeholder="resource.folder_name_placeholder">
                         </div>
                     </div>
 
                     <div class="modal-actions">
-                        <button class="btn secondary" onclick="app.closeModal('modal-edit-sight')">取消</button>
+                        <button class="btn secondary" onclick="app.closeModal('modal-edit-sight')" data-i18n="common.cancel">取消</button>
                         <button class="btn primary" onclick="app.saveSightEdit()">
-                            <i class="ri-save-line"></i> 保存修改
+                            <i class="ri-save-line"></i> <span data-i18n="resource.save_changes">保存修改</span>
                         </button>
                     </div>
                 </div>
@@ -1815,8 +1817,8 @@
 
     <div class="modal-overlay" id="modal-crop-cover">
         <div class="modal-content crop-modal">
-            <h2>裁剪封面</h2>
-            <p class="subtitle">拖动图片调整位置，使用滚轮/滑块缩放</p>
+            <h2 data-i18n="modal.crop_cover_title">裁剪封面</h2>
+            <p class="subtitle" data-i18n="modal.crop_cover_subtitle">拖动图片调整位置，使用滚轮/滑块缩放</p>
 
             <div class="crop-stage" id="crop-stage">
                 <canvas id="crop-canvas" width="640" height="360"></canvas>
@@ -1825,15 +1827,15 @@
 
             <div class="crop-controls">
                 <label class="crop-zoom">
-                    <span>缩放</span>
+                    <span data-i18n="modal.zoom">缩放</span>
                     <input id="crop-zoom" type="range" min="0.2" max="3" step="0.01" value="1">
                 </label>
             </div>
 
             <div class="modal-actions">
-                <button class="btn secondary" onclick="app.closeModal('modal-crop-cover')">取消</button>
+                <button class="btn secondary" onclick="app.closeModal('modal-crop-cover')" data-i18n="common.cancel">取消</button>
                 <button class="btn primary" onclick="app.applyCroppedCover()">
-                    <i class="ri-check-line"></i> 使用此封面
+                    <i class="ri-check-line"></i> <span data-i18n="modal.use_cover">使用此封面</span>
                 </button>
             </div>
         </div>
@@ -1845,52 +1847,52 @@
             <button class="modal-close-x" onclick="app.closeModal('modal-support-me')">
                 <i class="ri-close-line"></i>
             </button>
-            <h2 style="margin-top: 0; margin-bottom: 4px;">支持一下我</h2>
-            <p class="subtitle" style="margin-bottom: 2px; font-size: 14px;">非常感谢给我钱！你的支持是我持续更新的动力，本软件个人开发时长近1000小时啦！</p>
-            <p class="subtitle" style="margin-bottom: 2px; font-size: 13px; color: var(--text-sec);">
+            <h2 style="margin-top: 0; margin-bottom: 4px;" data-i18n="support.title">支持一下我</h2>
+            <p class="subtitle" style="margin-bottom: 2px; font-size: 14px;" data-i18n="support.subtitle">非常感谢给我钱！你的支持是我持续更新的动力，本软件个人开发时长近1000小时啦！</p>
+            <p class="subtitle" style="margin-bottom: 2px; font-size: 13px; color: var(--text-sec);" data-i18n="support.cost_note">
                 还可以帮我减轻服务器和大模型API的成本！</p>
             <p class="subtitle" style="margin-bottom: 12px; font-size: 12px; color: #f97316; font-weight: 500;">
-                <i class="ri-chat-smile-2-line" style="margin-right: 4px;"></i>如果您通过微信，或在此之前通过微信赞助过我，请带截图私聊我获取礼物！</p>
+                <i class="ri-chat-smile-2-line" style="margin-right: 4px;"></i><span data-i18n="support.wechat_note">如果您通过微信，或在此之前通过微信赞助过我，请带截图私聊我获取礼物！</span></p>
 
             <div class="support-qr-row">
-                <div class="support-qr-item" onclick="app.openImagePreview('assets/aifadian.png', '爱发电')">
+                <div class="support-qr-item" onclick="app.openImagePreview('assets/aifadian.png', app.t('support.aifadian'))">
                     <div class="support-qr-img-wrap">
-                        <img src="assets/aifadian.png" alt="爱发电">
+                        <img src="assets/aifadian.png" alt="爱发电" data-i18n-alt="support.aifadian">
                         <div class="support-qr-overlay">
                             <i class="ri-zoom-in-line"></i>
                         </div>
                     </div>
-                    <span class="support-qr-name">爱发电</span>
+                    <span class="support-qr-name" data-i18n="support.aifadian">爱发电</span>
                 </div>
-                <div class="support-qr-item" onclick="app.openImagePreview('assets/laomi.png', '微信赞赏')">
+                <div class="support-qr-item" onclick="app.openImagePreview('assets/laomi.png', app.t('support.wechat_reward'))">
                     <div class="support-qr-img-wrap">
-                        <img src="assets/laomi.png" alt="微信赞赏">
+                        <img src="assets/laomi.png" alt="微信赞赏" data-i18n-alt="support.wechat_reward">
                         <div class="support-qr-overlay">
                             <i class="ri-zoom-in-line"></i>
                         </div>
                     </div>
-                    <span class="support-qr-name">微信赞赏</span>
+                    <span class="support-qr-name" data-i18n="support.wechat_reward">微信赞赏</span>
                 </div>
             </div>
 
             <div class="support-free-section">
-                <p class="support-free-title"><i class="ri-information-line"></i> 如果你是学生请不要花钱打赏我，你可以选择以下方式支持我</p>
-                <p class="support-free-desc">以下方式对我的帮助也很大：</p>
+                <p class="support-free-title"><i class="ri-information-line"></i> <span data-i18n="support.student_note">如果你是学生请不要花钱打赏我，你可以选择以下方式支持我</span></p>
+                <p class="support-free-desc" data-i18n="support.free_desc">以下方式对我的帮助也很大：</p>
                 <div class="support-free-list">
                     <div class="support-free-item">
                         <i class="ri-star-fill" style="color: #FFB800;"></i>
                         <a href="https://github.com/AimerSo/Aimer_WT" target="_blank" class="support-link-text github"
-                            onclick="app.openExternal('https://github.com/AimerSo/Aimer_WT'); return false;">在 GitHub
+                            onclick="app.openExternal('https://github.com/AimerSo/Aimer_WT'); return false;" data-i18n="support.github_star_text">在 GitHub
                             给项目点个 Star，帮助更多人发现（可点击跳转）</a>
                     </div>
                     <div class="support-free-item">
                         <i class="ri-bilibili-fill" style="color: #FB7299;"></i>
                         <a href="https://b23.tv/Z0hfm59" target="_blank" class="support-link-text bilibili"
-                            onclick="app.openExternal('https://b23.tv/Z0hfm59'); return false;">在哔哩哔哩关注我，获取最新动态和教程（可点击跳转）</a>
+                            onclick="app.openExternal('https://b23.tv/Z0hfm59'); return false;" data-i18n="support.bili_follow_text">在哔哩哔哩关注我，获取最新动态和教程（可点击跳转）</a>
                     </div>
                     <div class="support-free-item">
                         <i class="ri-server-fill" style="color: var(--primary);"></i>
-                        <span>GitHub Star 可帮我申请开源项目服务器资源</span>
+                        <span data-i18n="support.server_resource_text">GitHub Star 可帮我申请开源项目服务器资源</span>
                     </div>
                 </div>
             </div>
@@ -1899,11 +1901,11 @@
                 <a href="https://github.com/AimerSo/Aimer_WT" target="_blank" class="btn secondary support-action-btn"
                     onclick="app.openExternal('https://github.com/AimerSo/Aimer_WT'); return false;"
                     style="text-decoration: none;">
-                    <i class="ri-github-fill"></i> GitHub 点星
+                    <i class="ri-github-fill"></i> <span data-i18n="support.github_star">GitHub 点星</span>
                 </a>
                 <a href="https://b23.tv/Z0hfm59" target="_blank" class="btn secondary support-action-btn"
                     onclick="app.openExternal('https://b23.tv/Z0hfm59'); return false;" style="text-decoration: none;">
-                    <i class="ri-bilibili-fill"></i> B站关注
+                    <i class="ri-bilibili-fill"></i> <span data-i18n="support.bili_follow">B站关注</span>
                 </a>
             </div>
         </div>
@@ -1913,12 +1915,12 @@
     <div class="modal-overlay" id="modal-image-preview"
         onclick="if(event.target===this)app.closeModal('modal-image-preview')">
         <div class="modal-content" style="max-width: 500px; padding: 20px;">
-            <h3 id="image-preview-title" style="margin-top: 0; margin-bottom: 16px;">图片预览</h3>
+            <h3 id="image-preview-title" style="margin-top: 0; margin-bottom: 16px;" data-i18n="modal.image_preview">图片预览</h3>
             <div class="image-preview-wrap">
-                <img id="image-preview-img" src="" alt="预览">
+                <img id="image-preview-img" src="" alt="预览" data-i18n-alt="modal.image_preview_alt">
             </div>
             <div class="modal-actions" style="margin-top: 20px;">
-                <button class="btn primary" onclick="app.closeModal('modal-image-preview')">关闭</button>
+                <button class="btn primary" onclick="app.closeModal('modal-image-preview')" data-i18n="common.close">关闭</button>
             </div>
         </div>
     </div>
@@ -1926,14 +1928,14 @@
     <!-- WTLive / WTLiker 站点选择模态框 -->
     <div class="modal-overlay" id="modal-workshop">
         <div class="modal-content" style="max-width: 500px;">
-            <h2>选择创意工坊站点</h2>
-            <p class="subtitle" style="margin-bottom: 25px;">请选择要打开的站点</p>
+            <h2 data-i18n="modal.workshop_title">选择创意工坊站点</h2>
+            <p class="subtitle" style="margin-bottom: 25px;" data-i18n="modal.workshop_subtitle">请选择要打开的站点</p>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <button class="btn big-btn secondary square-btn" onclick="app.openWorkshop('live')">
                     <i class="ri-global-line"></i>
                     <div class="btn-text">
-                        <div class="title">WTLive (国际)</div>
+                        <div class="title" data-i18n="modal.wtlive_global">WTLive (国际)</div>
                         <div class="desc">live.warthunder.com</div>
                     </div>
                 </button>
@@ -1941,7 +1943,7 @@
                 <button class="btn big-btn primary square-btn" onclick="app.openWorkshop('liker')">
                     <i class="ri-home-5-line"></i>
                     <div class="btn-text">
-                        <div class="title">WTLiker (国内)</div>
+                        <div class="title" data-i18n="modal.wtliker_local">WTLiker (国内)</div>
                         <div class="desc">wtliker.com</div>
                     </div>
                 </button>
@@ -1949,15 +1951,15 @@
 
             <div class="modal-actions" style="margin-top: 25px;">
                 <button class="btn secondary" onclick="app.closeModal('modal-workshop')"
-                    style="width: 100%;">取消</button>
+                    style="width: 100%;" data-i18n="common.cancel">取消</button>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="modal-launch-settings">
         <div class="modal-content" style="max-width: 500px;">
-            <h2>启动设置</h2>
-            <p class="subtitle" style="margin-bottom: 25px;">选择点击“开始游戏”时的启动方式</p>
+            <h2 data-i18n="modal.launch_settings_title">启动设置</h2>
+            <p class="subtitle" style="margin-bottom: 25px;" data-i18n="modal.launch_settings_desc">选择点击“开始游戏”时的启动方式</p>
 
             <div style="display: flex; flex-direction: column; gap: 12px;">
                 <div class="option-card" id="option-launch-launcher" onclick="app.saveLaunchSettings('launcher')">
@@ -1965,8 +1967,8 @@
                         <i class="ri-rocket-2-line"></i>
                     </div>
                     <div class="option-card-content">
-                        <div class="option-card-title">官方启动器</div>
-                        <div class="option-card-desc">使用 Launcher.exe 启动（默认）</div>
+                        <div class="option-card-title" data-i18n="modal.launch_launcher">官方启动器</div>
+                        <div class="option-card-desc" data-i18n="modal.launch_launcher_desc">使用 Launcher.exe 启动（默认）</div>
                     </div>
                     <div class="option-card-check">
                         <i class="ri-check-line" style="font-size: 20px; color: var(--primary); display: none;"></i>
@@ -1978,8 +1980,8 @@
                         <i class="ri-steam-line"></i>
                     </div>
                     <div class="option-card-content">
-                        <div class="option-card-title">Steam 启动</div>
-                        <div class="option-card-desc">调用 Steam 协议启动，支持时长统计</div>
+                        <div class="option-card-title" data-i18n="modal.launch_steam">Steam 启动</div>
+                        <div class="option-card-desc" data-i18n="modal.launch_steam_desc">调用 Steam 协议启动，支持时长统计</div>
                     </div>
                     <div class="option-card-check">
                         <i class="ri-check-line" style="font-size: 20px; color: var(--primary); display: none;"></i>
@@ -1989,7 +1991,7 @@
 
             <div class="modal-actions" style="margin-top: 25px;">
                 <button class="btn secondary" onclick="app.closeModal('modal-launch-settings')"
-                    style="width: 100%;">取消</button>
+                    style="width: 100%;" data-i18n="common.cancel">取消</button>
             </div>
         </div>
     </div>
@@ -2139,10 +2141,10 @@
     </div>
 
     <div id="tooltip" class="tooltip"></div>
-    <button id="btn-guide-help" type="button" onclick="app.startGuide(true)" title="新手教程" aria-label="新手教程">
+    <button id="btn-guide-help" type="button" onclick="app.startGuide(true)" title="新手教程" aria-label="新手教程" data-i18n-title="header.guide" data-i18n-aria-label="header.guide">
         <i class="ri-question-line"></i>
     </button>
-    <button id="btn-notification-bell" type="button" title="消息中心" aria-label="消息中心" style="display:none;">
+    <button id="btn-notification-bell" type="button" title="消息中心" aria-label="消息中心" style="display:none;" data-i18n-title="header.notification_center" data-i18n-aria-label="header.notification_center">
         <i class="ri-notification-3-line"></i>
         <span class="bell-badge"></span>
     </button>
@@ -2153,6 +2155,8 @@
     <script src="i18n/zh_cn.js"></script>
     <script src="i18n/zh_tw.js"></script>
     <script src="i18n/en_us.js"></script>
+    <script src="i18n/ru_ru.js"></script>
+    <script src="i18n/de_de.js"></script>
     <script src="loading_voice_package.js"></script>
     <script src="components/AppDropdownMenu.js"></script>
     <!-- 新功能模块脚本 -->

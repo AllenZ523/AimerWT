@@ -259,6 +259,8 @@ const app = {
                 return "zh_tw";
             }
             if (normalized.startsWith("en")) return "en_us";
+            if (normalized.startsWith("ru")) return "ru_ru";
+            if (normalized.startsWith("de")) return "de_de";
             if (normalized.startsWith("zh")) return "zh_cn";
         }
         return "zh_cn";
@@ -284,6 +286,9 @@ const app = {
         }
         if (this._pathUiReady) {
             this.updatePathUI(this.currentGamePath || "", this.currentPathValid, { skipInstalledRefresh: true });
+        }
+        if (typeof this.refreshDynamicI18n === 'function') {
+            this.refreshDynamicI18n();
         }
         return applied;
     },
@@ -515,7 +520,10 @@ const app = {
     // --- 页面切换 ---
     switchTab(tabId) {
         const current = document.querySelector('.page.active');
-        if (current && current.id === `page-${tabId}`) return;
+        if (current && current.id === `page-${tabId}`) {
+            if (tabId === 'camo') this.ensureCamoResourceLoaded();
+            return;
+        }
 
         const now = (window.performance && performance.now) ? performance.now() : Date.now();
         if (this._lastTabSwitchAt && (now - this._lastTabSwitchAt) < 120) return;
@@ -531,23 +539,29 @@ const app = {
 
         if (tabId === 'camo') {
             setTimeout(() => {
-                const camoPage = document.getElementById('page-camo');
-                const skinsView = document.getElementById('view-skins');
-                const sightsView = document.getElementById('view-sights');
-                if (!camoPage || !skinsView) return;
-                if (!camoPage.classList.contains('active')) return;
-                if (skinsView.classList.contains('active')) {
-                    this.updateResourceStorage('skins');
-                    if (!this._skinsLoaded) this.refreshSkins();
-                    return;
-                }
-                if (sightsView && sightsView.classList.contains('active')) {
-                    this.updateResourceStorage('sights');
-                    if (!this._sightsLoaded) this.loadSightsView();
-                }
+                this.ensureCamoResourceLoaded();
             }, 80);
         } else if (tabId === 'lib') {
             if (!this._libraryLoaded) this.refreshLibrary();
+        }
+    },
+
+    ensureCamoResourceLoaded() {
+        const camoPage = document.getElementById('page-camo');
+        const skinsView = document.getElementById('view-skins');
+        const sightsView = document.getElementById('view-sights');
+        if (!camoPage || !skinsView) return;
+        if (!camoPage.classList.contains('active')) return;
+
+        if (skinsView.classList.contains('active')) {
+            this.updateResourceStorage('skins');
+            if (!this._skinsLoaded && !this._skinsRefreshing) this.refreshSkins();
+            return;
+        }
+
+        if (sightsView && sightsView.classList.contains('active')) {
+            this.updateResourceStorage('sights');
+            if (!this._sightsLoaded) this.loadSightsView();
         }
     },
 
@@ -590,11 +604,45 @@ const app = {
 
         try {
             const forceRefresh = !!(opts && opts.manual);
-            // 改用异步接口，让扫描在后台进行，前端立即响应
-            pywebview.api.refresh_skins_async({ force_refresh: forceRefresh });
+            if (this._skinsFallbackTimer) {
+                clearTimeout(this._skinsFallbackTimer);
+                this._skinsFallbackTimer = null;
+            }
+
+            const loadBySyncApi = async () => {
+                if (seq !== this._skinsRefreshSeq) return;
+                try {
+                    const res = await pywebview.api.get_skins_list({ force_refresh: forceRefresh });
+                    if (seq !== this._skinsRefreshSeq) return;
+                    this.onSkinsListReady(res);
+                } catch (err) {
+                    console.error(err);
+                    this._skinsRefreshing = false;
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.classList.remove('is-loading');
+                    }
+                    countEl.textContent = this.t('resource.count_zero');
+                }
+            };
+
+            if (typeof pywebview.api.refresh_skins_async === 'function') {
+                const started = await pywebview.api.refresh_skins_async({ force_refresh: forceRefresh });
+                if (!started) {
+                    await loadBySyncApi();
+                    return;
+                }
+                this._skinsFallbackTimer = setTimeout(loadBySyncApi, 2500);
+            } else {
+                await loadBySyncApi();
+            }
         } catch (e) {
             console.error(e);
             this._skinsRefreshing = false;
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.classList.remove('is-loading');
+            }
         }
     },
 
@@ -604,6 +652,11 @@ const app = {
         const countEl = document.getElementById('skins-count');
         const refreshBtn = document.getElementById('btn-refresh-skins');
 
+        if (this._skinsFallbackTimer) {
+            clearTimeout(this._skinsFallbackTimer);
+            this._skinsFallbackTimer = null;
+        }
+
         if (!listEl || !countEl || !res || !res.valid) {
             this._skinsRefreshing = false;
             if (refreshBtn) refreshBtn.classList.remove('is-loading');
@@ -611,6 +664,7 @@ const app = {
         }
 
         this._skinsItems = Array.isArray(res.items) ? res.items : [];
+        this._skinsLoaded = true;
 
         const searchInput = document.getElementById('skins-search-input');
         const sortSelect = document.getElementById('skins-sort-select');
@@ -749,7 +803,7 @@ const app = {
                 const cardTitle = app._escapeHtml(
                     displayName === folderName
                         ? String(it.path || '')
-                        : `${displayName}\n原始文件夹名: ${folderName}\n${it.path || ''}`
+                        : `${displayName}\n${app.t('resource.original_folder_title', { name: folderName })}\n${it.path || ''}`
                 );
 
                 return `
@@ -792,7 +846,6 @@ const app = {
 
     _finishSkinsRender() {
         const refreshBtn = document.getElementById('btn-refresh-skins');
-        this._skinsLoaded = true;
         this._skinsRefreshing = false;
         if (refreshBtn) {
             refreshBtn.disabled = false;
@@ -872,12 +925,12 @@ const app = {
         const newName = String(folderInput?.value || '').trim();
 
         if (!displayName) {
-            app.showAlert(app.t("common.error"), "显示名称不能为空", "error");
+            app.showAlert(app.t("common.error"), app.t("resource.display_name_required"), "error");
             return;
         }
 
         if (displayName.length > 32) {
-            app.showAlert(app.t("common.error"), "显示名称不能超过 32 个字符", "error");
+            app.showAlert(app.t("common.error"), app.t("resource.display_name_too_long"), "error");
             return;
         }
 
@@ -904,7 +957,7 @@ const app = {
         try {
             const res = await pywebview.api.set_resource_display_name('skins', this.currentEditSkin, displayName);
             if (!res || !res.success) {
-                app.showAlert(app.t("common.failure"), (res && res.msg) ? res.msg : "显示名称保存失败", "error");
+                app.showAlert(app.t("common.failure"), (res && res.msg) ? res.msg : app.t("resource.display_name_save_failed"), "error");
                 return;
             }
         } catch (e) {
@@ -912,7 +965,7 @@ const app = {
             return;
         }
 
-        app.showAlert(app.t("common.success"), "涂装信息已保存", "success");
+        app.showAlert(app.t("common.success"), app.t("resource.skin_info_saved"), "success");
         app.closeModal('modal-edit-skin');
         this.refreshSkins();
     },
@@ -930,14 +983,14 @@ const app = {
             try {
                 const dataUrl = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.onerror = () => reject(new Error('读取图片失败'));
+                    reader.onerror = () => reject(new Error(app.t("common.read_image_failed")));
                     reader.onload = () => resolve(String(reader.result || ''));
                     reader.readAsDataURL(file);
                 });
                 this.openCropCoverModal(dataUrl);
             } catch (e) {
                 console.error(e);
-                this.showAlert("错误", "读取图片失败", "error");
+                this.showAlert(this.t("common.error"), this.t("common.read_image_failed"), "error");
             }
         };
         input.click();
@@ -977,11 +1030,11 @@ const app = {
         const displayName = String(displayInput?.value || '').trim();
         const newName = document.getElementById('edit-sight-name').value.trim();
         if (!displayName) {
-            app.showAlert(app.t("common.error"), "显示名称不能为空", "error");
+            app.showAlert(app.t("common.error"), app.t("resource.display_name_required"), "error");
             return;
         }
         if (displayName.length > 32) {
-            app.showAlert(app.t("common.error"), "显示名称不能超过 32 个字符", "error");
+            app.showAlert(app.t("common.error"), app.t("resource.display_name_too_long"), "error");
             return;
         }
         if (!newName) {
@@ -1007,7 +1060,7 @@ const app = {
         try {
             const res = await pywebview.api.set_resource_display_name('sights', this.currentEditSight, displayName);
             if (!res || !res.success) {
-                app.showAlert(app.t("common.failure"), (res && res.msg) ? res.msg : "显示名称保存失败", "error");
+                app.showAlert(app.t("common.failure"), (res && res.msg) ? res.msg : app.t("resource.display_name_save_failed"), "error");
                 return;
             }
         } catch (e) {
@@ -1015,7 +1068,7 @@ const app = {
             return;
         }
 
-        app.showAlert(app.t("common.success"), "炮镜信息已保存", "success");
+        app.showAlert(app.t("common.success"), app.t("resource.sight_info_saved"), "success");
         app.closeModal('modal-edit-sight');
         this.refreshSights({ manual: true });
     },
@@ -1033,14 +1086,14 @@ const app = {
             try {
                 const dataUrl = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.onerror = () => reject(new Error('读取图片失败'));
+                    reader.onerror = () => reject(new Error(app.t("common.read_image_failed")));
                     reader.onload = () => resolve(String(reader.result || ''));
                     reader.readAsDataURL(file);
                 });
                 this.openCropCoverModal(dataUrl);
             } catch (e) {
                 console.error(e);
-                this.showAlert("错误", "读取图片失败", "error");
+                this.showAlert(this.t("common.error"), this.t("common.read_image_failed"), "error");
             }
         };
         input.click();
@@ -1199,18 +1252,18 @@ const app = {
             // --- 炮镜 ---
             if (target === "sight") {
                 if (!window.pywebview?.api?.update_sight_cover_data) {
-                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
                     return;
                 }
                 const res = await pywebview.api.update_sight_cover_data(this.currentEditSight, dataUrl);
                 if (res && res.success) {
                     const coverImg = document.getElementById('edit-sight-cover');
                     if (coverImg) coverImg.src = dataUrl;
-                    this.showAlert("成功", "封面已更新！", "success");
+                    this.showAlert(this.t("common.success"), this.t("tools.cover_updated"), "success");
                     this.refreshSights({ manual: true });
                     this.closeModal('modal-crop-cover');
                 } else {
-                    this.showAlert("错误", (res && res.msg) ? res.msg : "封面更新失败", "error");
+                    this.showAlert(this.t("common.error"), (res && res.msg) ? res.msg : this.t("tools.cover_update_failed"), "error");
                 }
                 return;
             }
@@ -1218,18 +1271,18 @@ const app = {
             // --- 任务库 ---
             if (target === "task") {
                 if (!window.pywebview?.api?.update_task_cover_data || typeof TaskLibrary === 'undefined') {
-                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
                     return;
                 }
                 const res = await pywebview.api.update_task_cover_data(TaskLibrary._current_edit_name, dataUrl);
                 if (res && res.success) {
                     const coverImg = document.getElementById('edit-task-cover');
                     if (coverImg) coverImg.src = dataUrl;
-                    this.showAlert("成功", "封面已更新！", "success");
+                    this.showAlert(this.t("common.success"), this.t("tools.cover_updated"), "success");
                     TaskLibrary.refresh_list();
                     this.closeModal('modal-crop-cover');
                 } else {
-                    this.showAlert("错误", (res && res.msg) ? res.msg : "封面更新失败", "error");
+                    this.showAlert(this.t("common.error"), (res && res.msg) ? res.msg : this.t("tools.cover_update_failed"), "error");
                 }
                 return;
             }
@@ -1237,18 +1290,18 @@ const app = {
             // --- 模型库 ---
             if (target === "model") {
                 if (!window.pywebview?.api?.update_model_cover_data || typeof ModelLibrary === 'undefined') {
-                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
                     return;
                 }
                 const res = await pywebview.api.update_model_cover_data(ModelLibrary._current_edit_name, dataUrl);
                 if (res && res.success) {
                     const coverImg = document.getElementById('edit-model-cover');
                     if (coverImg) coverImg.src = dataUrl;
-                    this.showAlert("成功", "封面已更新！", "success");
+                    this.showAlert(this.t("common.success"), this.t("tools.cover_updated"), "success");
                     ModelLibrary.refresh_list();
                     this.closeModal('modal-crop-cover');
                 } else {
-                    this.showAlert("错误", (res && res.msg) ? res.msg : "封面更新失败", "error");
+                    this.showAlert(this.t("common.error"), (res && res.msg) ? res.msg : this.t("tools.cover_update_failed"), "error");
                 }
                 return;
             }
@@ -1256,25 +1309,25 @@ const app = {
             // --- 机库 ---
             if (target === "hangar") {
                 if (!window.pywebview?.api?.update_hangar_cover_data || typeof Hangar === 'undefined') {
-                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
                     return;
                 }
                 const res = await pywebview.api.update_hangar_cover_data(Hangar._current_edit_name, dataUrl);
                 if (res && res.success) {
                     const coverImg = document.getElementById('edit-hangar-cover');
                     if (coverImg) coverImg.src = dataUrl;
-                    this.showAlert("成功", "封面已更新！", "success");
+                    this.showAlert(this.t("common.success"), this.t("tools.cover_updated"), "success");
                     Hangar.refresh_list();
                     this.closeModal('modal-crop-cover');
                 } else {
-                    this.showAlert("错误", (res && res.msg) ? res.msg : "封面更新失败", "error");
+                    this.showAlert(this.t("common.error"), (res && res.msg) ? res.msg : this.t("tools.cover_update_failed"), "error");
                 }
                 return;
             }
 
             // --- 涂装（默认） ---
             if (!window.pywebview?.api?.update_skin_cover_data) {
-                this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
                 return;
             }
 
@@ -1282,22 +1335,22 @@ const app = {
             if (res && res.success) {
                 const coverImg = document.getElementById('edit-skin-cover');
                 if (coverImg) coverImg.src = dataUrl;
-                this.showAlert("成功", "封面已更新！", "success");
+                this.showAlert(this.t("common.success"), this.t("tools.cover_updated"), "success");
                 this.refreshSkins({ manual: true });
                 this.closeModal('modal-crop-cover');
             } else {
-                this.showAlert("错误", (res && res.msg) ? res.msg : "封面更新失败", "error");
+                this.showAlert(this.t("common.error"), (res && res.msg) ? res.msg : this.t("tools.cover_update_failed"), "error");
             }
         } catch (e) {
             console.error(e);
-            this.showAlert("错误", "封面更新失败", "error");
+            this.showAlert(this.t("common.error"), this.t("tools.cover_update_failed"), "error");
         }
     },
 
 
     importSkinZipDialog() {
         if (!this.currentGamePath) {
-            app.showAlert("提示", "请先在主页设置游戏路径！");
+            app.showAlert(app.t("common.info"), app.t("home.path_required"));
             this.switchTab('home');
             return;
         }
@@ -1307,29 +1360,29 @@ const app = {
 
     async importSightsFileDialog() {
         if (!this.sightsPath) {
-            app.showAlert("提示", "请先设置 UserSights 路径！");
+            app.showAlert(app.t("common.info"), app.t("tools.set_sights_path"));
             return;
         }
         const api = window.pywebview?.api;
         if (!api?.select_sight_import_file || !api?.import_sight_file_from_path) {
-            this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+            this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
             return;
         }
         try {
             const selected = await api.select_sight_import_file();
             if (!selected || selected.cancelled) return;
             if (!selected.success || !selected.path) {
-                this.showAlert("错误", selected?.msg || "选择炮镜文件失败", "error");
+                this.showAlert(this.t("common.error"), selected?.msg || this.t("common.select_path_failed", { message: this.t("resource.import_sight_file") }), "error");
                 return;
             }
             const options = await this.buildSightImportOptions(selected.path);
             if (!options) return;
             const started = await api.import_sight_file_from_path(selected.path, options);
             if (!started) {
-                this.showAlert("错误", "启动炮镜导入失败", "error");
+                this.showAlert(this.t("common.error"), this.t("common.operation_failed", { message: this.t("resource.import_sight_file") }), "error");
             }
         } catch (error) {
-            this.showAlert("错误", error?.message || "导入炮镜文件失败", "error");
+            this.showAlert(this.t("common.error"), error?.message || this.t("common.operation_failed", { message: this.t("resource.import_sight_file") }), "error");
         }
     },
 
@@ -1341,7 +1394,8 @@ const app = {
         const text = String(fileNameOrPath || "");
         const lower = text.toLowerCase();
         const options = { conflict_strategy: "backup" };
-        if (!lower.endsWith(".blk")) return options;
+        const needsTargetDialog = [".blk", ".zip", ".rar", ".7z"].some(ext => lower.endsWith(ext));
+        if (!needsTargetDialog) return options;
         return this.showSightImportTargetDialog(fileNameOrPath);
     },
 
@@ -1355,29 +1409,29 @@ const app = {
                 modal.className = "modal-overlay";
                 modal.innerHTML = `
                     <div class="modal-content sight-import-target-modal">
-                        <h2>导入炮镜</h2>
+                        <h2>${this.t("sight_import.title")}</h2>
                         <p class="subtitle" id="sight-import-file-name"></p>
                         <div class="sight-import-target-options">
                             <label class="sight-import-target-option">
                                 <input type="radio" name="sight-import-target-mode" value="all" checked>
                                 <span>
-                                    <strong>应用到所有载具</strong>
-                                    <small>安装到 UserSights/all_tanks</small>
+                                    <strong>${this.t("sight_import.apply_all")}</strong>
+                                    <small>${this.t("sight_import.apply_all_desc")}</small>
                                 </span>
                             </label>
                             <label class="sight-import-target-option">
                                 <input type="radio" name="sight-import-target-mode" value="vehicle">
                                 <span>
-                                    <strong>只给单独载具</strong>
-                                    <small>使用下面输入的载具目录名</small>
+                                    <strong>${this.t("sight_import.apply_vehicle")}</strong>
+                                    <small>${this.t("sight_import.apply_vehicle_desc")}</small>
                                 </span>
                             </label>
                         </div>
-                        <input id="sight-import-target-input" class="input-v2 sight-import-target-input" placeholder="例如 ussr_t_72b">
+                        <input id="sight-import-target-input" class="input-v2 sight-import-target-input" placeholder="${this.t("sight_import.vehicle_placeholder")}">
                         <div class="modal-actions">
-                            <button class="btn secondary" id="sight-import-target-cancel">取消</button>
+                            <button class="btn secondary" id="sight-import-target-cancel">${this.t("common.cancel")}</button>
                             <button class="btn primary" id="sight-import-target-ok">
-                                <i class="ri-upload-cloud-2-line"></i> 开始导入
+                                <i class="ri-upload-cloud-2-line"></i> ${this.t("sight_import.start")}
                             </button>
                         </div>
                     </div>
@@ -1415,7 +1469,7 @@ const app = {
                 const mode = modeInputs.find(item => item.checked)?.value || "all";
                 const targetDir = mode === "vehicle" ? String(inputEl.value || "").trim() : "all_tanks";
                 if (mode === "vehicle" && !targetDir) {
-                    this.showAlert("提示", "请输入载具目录名，例如 ussr_t_72b", "warn");
+                    this.showAlert(this.t("common.info"), this.t("sight_import.vehicle_required"), "warn");
                     inputEl.focus();
                     return;
                 }
@@ -1426,7 +1480,7 @@ const app = {
                 if (event.target === modal) finish(null);
             };
 
-            if (fileNameEl) fileNameEl.textContent = `文件: ${String(fileNameOrPath || "").split(/[\\/]/).pop()}`;
+            if (fileNameEl) fileNameEl.textContent = this.t("sight_import.file_label", { name: String(fileNameOrPath || "").split(/[\\/]/).pop() });
             modeInputs.forEach(input => {
                 input.checked = input.value === "all";
                 input.addEventListener("change", updateInputState);
@@ -1444,7 +1498,7 @@ const app = {
     async uploadArchiveFileForImport(file, targetType, importOptions) {
         const api = window.pywebview?.api;
         if (!api?.begin_browser_archive_import || !api?.append_browser_archive_chunk || !api?.finish_browser_archive_import) {
-            this.showAlert("错误", "拖入导入接口未就绪", "error");
+                this.showAlert(this.t("common.error"), this.t("drop.drag_api_not_ready"), "error");
             return false;
         }
 
@@ -1455,7 +1509,7 @@ const app = {
 
         const readChunkAsBase64 = (blob) => new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onerror = () => reject(new Error("读取拖入文件失败"));
+            reader.onerror = () => reject(new Error(this.t("drop.write_drag_file_failed")));
             reader.onload = () => {
                 const text = String(reader.result || "");
                 const commaIndex = text.indexOf(",");
@@ -1466,13 +1520,13 @@ const app = {
 
         try {
             if (window.MinimalistLoading) {
-                MinimalistLoading.show(false, `正在接收: ${fileName}`);
-                MinimalistLoading.update(1, "正在准备拖入文件");
+                MinimalistLoading.show(false, this.t("drop.receive_file", { name: fileName }));
+                MinimalistLoading.update(1, this.t("drop.prepare_drag_file"));
             }
 
             const beginRes = await api.begin_browser_archive_import(targetType, fileName, fileSize, importOptions || {});
             if (!beginRes || !beginRes.success || !beginRes.session_id) {
-                this.showAlert("错误", beginRes?.msg || "创建拖入导入任务失败", "error");
+                this.showAlert(this.t("common.error"), beginRes?.msg || this.t("drop.create_drag_task_failed"), "error");
                 if (window.MinimalistLoading) MinimalistLoading.hide();
                 return false;
             }
@@ -1485,13 +1539,13 @@ const app = {
                 const chunkBase64 = await readChunkAsBase64(blob);
                 const appendRes = await api.append_browser_archive_chunk(sessionId, chunkBase64);
                 if (!appendRes || !appendRes.success) {
-                    throw new Error(appendRes?.msg || "写入拖入文件失败");
+                    throw new Error(appendRes?.msg || this.t("drop.write_drag_file_failed"));
                 }
                 offset += blob.size;
                 chunkIndex += 1;
                 if (window.MinimalistLoading) {
                     const percent = Math.max(1, Math.min(95, Math.round((offset / Math.max(fileSize, 1)) * 95)));
-                    MinimalistLoading.update(percent, `正在接收: ${fileName}`);
+                    MinimalistLoading.update(percent, this.t("drop.receive_file", { name: fileName }));
                 }
                 if (chunkIndex % 8 === 0) {
                     await new Promise(resolve => setTimeout(resolve, 0));
@@ -1500,7 +1554,7 @@ const app = {
 
             const finishRes = await api.finish_browser_archive_import(sessionId);
             if (!finishRes || !finishRes.success) {
-                this.showAlert("错误", finishRes?.msg || "拖入导入失败", "error");
+                this.showAlert(this.t("common.error"), finishRes?.msg || this.t("drop.drag_import_failed"), "error");
                 if (window.MinimalistLoading) MinimalistLoading.hide();
                 return false;
             }
@@ -1513,7 +1567,7 @@ const app = {
                 } catch (_) { }
             }
             if (window.MinimalistLoading) MinimalistLoading.hide();
-            this.showAlert("错误", error?.message || "拖入导入失败", "error");
+            this.showAlert(this.t("common.error"), error?.message || this.t("drop.drag_import_failed"), "error");
             return false;
         }
     },
@@ -1524,11 +1578,11 @@ const app = {
             resource_type: 'skins',
             target_selector: '#view-skins .res-main',
             icon: 'ri-upload-cloud-2-line',
-            title: '拖入涂装文件进行导入',
-            subtitle: '将 ZIP/RAR/7Z 压缩包放到此区域，AimerWT 会自动识别并导入到 UserSkins',
+            title: this.t('drop.skin_drag_title'),
+            subtitle: this.t('drop.skin_drag_subtitle'),
             allowed_exts: ['.zip', '.rar', '.7z'],
-            invalid_message: '当前涂装库仅支持拖入 .zip/.rar/.7z 压缩包',
-            missing_path_message: '拖入通道未就绪，请稍后重试或使用“导入涂装文件”按钮',
+            invalid_message: this.t('drop.skin_invalid_file'),
+            missing_path_message: this.t('drop.skin_missing_path'),
             backend_drop_fallback: false,
             active_check: () => {
                 const activeId = (document.querySelector('.page.active') || {}).id || '';
@@ -1537,7 +1591,7 @@ const app = {
             },
             on_missing_path: async () => {
                 if (!this.currentGamePath) {
-                    this.showAlert("提示", "请先在主页设置游戏路径！", "warn");
+                    this.showAlert(this.t("common.info"), this.t("home.path_required"), "warn");
                     this.switchTab('home');
                     return true;
                 }
@@ -1545,7 +1599,7 @@ const app = {
             },
             on_file_drop: async (file) => {
                 if (!this.currentGamePath) {
-                    this.showAlert("提示", "请先在主页设置游戏路径！", "warn");
+                    this.showAlert(this.t("common.info"), this.t("home.path_required"), "warn");
                     this.switchTab('home');
                     return;
                 }
@@ -1553,12 +1607,12 @@ const app = {
             },
             on_drop: async (zipPath) => {
                 if (!this.currentGamePath) {
-                    this.showAlert("提示", "请先在主页设置游戏路径！", "warn");
+                    this.showAlert(this.t("common.info"), this.t("home.path_required"), "warn");
                     this.switchTab('home');
                     return;
                 }
                 if (!window.pywebview?.api?.import_skin_zip_from_path) {
-                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
                     return;
                 }
                 pywebview.api.import_skin_zip_from_path(zipPath);
@@ -1606,12 +1660,12 @@ const app = {
             resource_type: 'sights',
             target_selector: '#view-sights .res-main',
             icon: 'ri-crosshair-2-line',
-            title: '拖入炮镜文件进行导入',
-            subtitle: '将 BLK/ZIP/RAR/7Z 炮镜文件放到此区域，AimerWT 会自动识别并导入到 UserSights',
+            title: this.t('drop.sight_drag_title'),
+            subtitle: this.t('drop.sight_drag_subtitle'),
             allowed_exts: ['.blk', '.zip', '.rar', '.7z'],
-            invalid_message: '当前炮镜库仅支持拖入 .blk/.zip/.rar/.7z 炮镜文件',
-            missing_path_message: '拖入通道未就绪，请稍后重试或使用“导入炮镜文件”按钮',
-            backend_drop_fallback: false,
+            invalid_message: this.t('drop.sight_invalid_file'),
+            missing_path_message: this.t('drop.sight_missing_path'),
+            backend_drop_fallback: true,
             active_check: () => {
                 const activeId = (document.querySelector('.page.active') || {}).id || '';
                 const sightsView = document.getElementById('view-sights');
@@ -1619,14 +1673,14 @@ const app = {
             },
             on_missing_path: async () => {
                 if (!this.sightsPath) {
-                    this.showAlert("提示", "请先设置 UserSights 路径！", "warn");
+                    this.showAlert(this.t("common.info"), this.t("tools.set_sights_path"), "warn");
                     return true;
                 }
                 return false;
             },
             on_file_drop: async (file) => {
                 if (!this.sightsPath) {
-                    this.showAlert("提示", "请先设置 UserSights 路径！", "warn");
+                    this.showAlert(this.t("common.info"), this.t("tools.set_sights_path"), "warn");
                     return;
                 }
                 const options = await this.buildSightImportOptions(file?.name || "");
@@ -1635,11 +1689,11 @@ const app = {
             },
             on_drop: async (zipPath) => {
                 if (!this.sightsPath) {
-                    this.showAlert("提示", "请先设置 UserSights 路径！", "warn");
+                    this.showAlert(this.t("common.info"), this.t("tools.set_sights_path"), "warn");
                     return;
                 }
                 if (!window.pywebview?.api?.import_sight_file_from_path) {
-                    this.showAlert("错误", "功能未就绪，请检查后端连接", "error");
+                    this.showAlert(this.t("common.error"), this.t("common.feature_not_ready"), "error");
                     return;
                 }
                 const options = await this.buildSightImportOptions(zipPath);
@@ -1838,7 +1892,7 @@ const app = {
             const remaining = Math.ceil((cooldown - (now - this._lastUpdateCheckTime)) / 1000);
             const min = Math.floor(remaining / 60);
             const sec = remaining % 60;
-            this.showAlert('提示', `请等待 ${min}分${sec}秒 后再次检测`, 'warn');
+            this.showAlert(this.t('common.info'), this.t('update.wait_retry', { min, sec }), 'warn');
             return;
         }
 
@@ -1846,7 +1900,7 @@ const app = {
         const badge = document.getElementById('update-status-badge');
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="ri-loader-4-line"></i> 检测中…';
+            btn.innerHTML = `<i class="ri-loader-4-line"></i> ${this.t('update.checking')}`;
         }
 
         try {
@@ -1854,7 +1908,7 @@ const app = {
             this._lastUpdateCheckTime = Date.now();
 
             if (!result?.success) {
-                this.showAlert('检查更新', result?.message || '检查失败', 'error');
+                this.showAlert(this.t('update.title'), result?.message || this.t('update.failed'), 'error');
                 if (badge) badge.style.display = 'none';
                 return;
             }
@@ -1862,27 +1916,27 @@ const app = {
             if (result.has_update) {
                 if (badge) {
                     badge.style.display = '';
-                    badge.textContent = '有新版本 ' + result.latest;
+                    badge.textContent = this.t('update.badge_new_version', { version: result.latest });
                     badge.style.background = 'var(--primary)';
                     badge.style.color = '#fff';
                 }
-                this.showAlert('发现新版本', `最新版本: ${result.latest}\n${result.changelog || ''}`, 'success');
+                this.showAlert(this.t('update.available_title'), this.t('update.latest_version', { version: result.latest, changelog: result.changelog || '' }), 'success');
             } else {
                 if (badge) {
                     badge.style.display = '';
-                    badge.textContent = '已是最新';
+                    badge.textContent = this.t('update.badge_latest');
                     badge.style.background = 'var(--bg-body)';
                     badge.style.color = 'var(--text-sec)';
                 }
-                this.showAlert('检查更新', result.message || '当前已是最新版本', 'success');
+                this.showAlert(this.t('update.title'), result.message || this.t('update.current_latest'), 'success');
             }
         } catch (e) {
             console.error('checkForUpdate failed:', e);
-            this.showAlert('检查更新', '检查失败，请稍后重试', 'error');
+            this.showAlert(this.t('update.title'), this.t('update.failed_retry'), 'error');
         } finally {
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="ri-refresh-line"></i> 检查更新';
+                btn.innerHTML = `<i class="ri-refresh-line"></i> ${this.t('settings.check_update')}`;
             }
         }
     },
@@ -1928,7 +1982,7 @@ const app = {
         const btn = document.getElementById('btn-submit-feedback');
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<i class="ri-send-plane-line"></i> 提交';
+            btn.innerHTML = `<i class="ri-send-plane-line"></i> ${this.t('feedback.submit')}`;
         }
     },
 
@@ -1952,12 +2006,12 @@ const app = {
         const category = checkedRadio ? checkedRadio.value : 'other';
 
         if (!content) {
-            this.showAlert('提示', '请输入反馈内容', 'warn');
+            this.showAlert(this.t('common.info'), this.t('feedback.content_required'), 'warn');
             return;
         }
 
         if (!window.pywebview?.api?.submit_feedback) {
-            this.showAlert('提示', '功能未就绪，请检查后端连接', 'error');
+            this.showAlert(this.t('common.info'), this.t('common.feature_not_ready'), 'error');
             return;
         }
 
@@ -1965,7 +2019,7 @@ const app = {
         const btn = document.getElementById('btn-submit-feedback');
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="ri-loader-4-line"></i> 提交中…';
+            btn.innerHTML = `<i class="ri-loader-4-line"></i> ${this.t('feedback.submitting')}`;
         }
 
         try {
@@ -1973,18 +2027,18 @@ const app = {
             if (res && res.submitted) {
                 this.closeModal('modal-feedback');
             } else {
-                this.showAlert('提示', (res && res.message) || '提交失败', 'warn');
+                this.showAlert(this.t('common.info'), (res && res.message) || this.t('feedback.submit_failed'), 'warn');
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="ri-send-plane-line"></i> 提交';
+                    btn.innerHTML = `<i class="ri-send-plane-line"></i> ${this.t('feedback.submit')}`;
                 }
             }
         } catch (e) {
             console.error('反馈提交异常:', e);
-            this.showAlert('错误', '提交异常，请稍后重试', 'error');
+            this.showAlert(this.t('common.error'), this.t('feedback.submit_exception'), 'error');
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="ri-send-plane-line"></i> 提交';
+                btn.innerHTML = `<i class="ri-send-plane-line"></i> ${this.t('feedback.submit')}`;
             }
         }
     },
@@ -2168,7 +2222,12 @@ const app = {
 
         if (titleEl) titleEl.textContent = this.t('modal.archive_password_title');
         if (fileEl) fileEl.textContent = archiveName ? this.t('modal.archive_file', { name: archiveName }) : '';
-        if (hintEl) hintEl.textContent = errorHint || '';
+        if (hintEl) {
+            const hintPayload = errorHint && typeof errorHint === 'object' ? errorHint : null;
+            hintEl.textContent = hintPayload?.key
+                ? this.t(hintPayload.key, hintPayload.params || {})
+                : (errorHint || '');
+        }
         input.value = '';
 
         modal.classList.remove('hiding');
@@ -2253,38 +2312,44 @@ const app = {
             .replace(/<br\s*\/?>/gi, ' ')
             .replace(/\s+/g, ' ')
             .trim();
-        return text.replace(/^\[[^\]]+\]\s*\[[A-Z]+\]\s*/i, '');
+        return text
+            .replace(/^\[[^\]]+\]\s*\[[A-Z]+\]\s*/i, '')
+            .replace(/^\[(SUCCESS|WARN|ERROR|INFO|SYS)\]\s*/i, '');
     },
 
     notifyToast(level, message) {
         const content = this.formatToastMessage(message);
         if (!content) return;
         if (level === 'ERROR') {
-            this.showErrorToast('错误', content);
+            this.showErrorToast(this.t('common.error'), content);
             return;
         }
         if (level === 'WARN') {
-            this.showWarnToast('警告', content);
+            this.showWarnToast(this.t('common.warn'), content);
             return;
         }
         if (level === 'SUCCESS') {
-            this.showInfoToast('成功', content);
+            this.showInfoToast(this.t('common.success'), content);
             return;
         }
-        this.showInfoToast('提示', content);
+        this.showInfoToast(this.t('common.info'), content);
+    },
+
+    notifyToastI18n(level, key, params = {}) {
+        this.notifyToast(level, this.t(key, params || {}));
     },
 
     showErrorToast(title, message, duration = 5000) {
         const toast = document.getElementById('toast-error');
         if (!toast) {
-            this.showAlert(title || '错误', message, 'error');
+            this.showAlert(title || this.t('common.error'), message, 'error');
             return;
         }
 
         const titleEl = toast.querySelector('.toast-error-title');
         const messageEl = toast.querySelector('.toast-error-message');
 
-        if (titleEl) titleEl.textContent = title || '错误';
+        if (titleEl) titleEl.textContent = title || this.t('common.error');
         if (messageEl) messageEl.textContent = message || '';
 
         toast.classList.remove('hiding');
@@ -2318,14 +2383,14 @@ const app = {
     showWarnToast(title, message, duration = 5000) {
         const toast = document.getElementById('toast-warn');
         if (!toast) {
-            this.showAlert(title || '警告', message, 'warn');
+            this.showAlert(title || this.t('common.warn'), message, 'warn');
             return;
         }
 
         const titleEl = toast.querySelector('.toast-warn-title');
         const messageEl = toast.querySelector('.toast-warn-message');
 
-        if (titleEl) titleEl.textContent = title || '警告';
+        if (titleEl) titleEl.textContent = title || this.t('common.warn');
         if (messageEl) messageEl.textContent = message || '';
 
         toast.classList.remove('hiding');
@@ -2359,7 +2424,7 @@ const app = {
     showInfoToast(title, message, duration = 5000) {
         const toast = document.getElementById('toast-info');
         if (!toast) {
-            this.showAlert(title || '提示', message, 'info');
+            this.showAlert(title || this.t('common.info'), message, 'info');
             return;
         }
 
@@ -2412,7 +2477,7 @@ const app = {
         const linkBtn = document.getElementById('alert-link-btn');
         const allowHtml = !!(options && options.allowHtml);
 
-        if (titleEl) titleEl.textContent = title || '提示';
+        if (titleEl) titleEl.textContent = title || this.t('modal.alert_default_title');
         if (msgEl) {
             if (allowHtml) msgEl.innerHTML = message || '';
             else msgEl.textContent = message || '';
@@ -2726,9 +2791,11 @@ const app = {
                 return;
             }
 
-            const message = typeof result === 'object' && result?.message
-                ? result.message
-                : this.t('home.start_game_failed');
+            const message = typeof result === 'object' && result?.message_key
+                ? this.t(result.message_key, result.message_params || {})
+                : (typeof result === 'object' && result?.message
+                    ? result.message
+                    : this.t('home.start_game_failed'));
             this.showAlert(this.t('common.error'), message, 'error');
         }).catch((e) => {
             const message = e && e.message ? e.message : String(e || '');
@@ -2811,13 +2878,13 @@ const app = {
         const toggle = document.getElementById('telemetry-switch');
         // 先还原 UI 状态，等待确认
         toggle.checked = !checked;
-        const action = checked ? "开启" : "关闭";
+        const action = checked ? this.t('settings.telemetry_enable_action') : this.t('settings.telemetry_disable_action');
         const message = checked
-            ? "开启遥测功能将允许软件发送匿名的使用统计与环境数据，帮助开发者改进软件体验。<br><br>确认要开启吗？"
-            : "关闭遥测功能后，开发者将无法收到您的使用反馈与统计，这可能会影响版本迭代方向。<br><br>确认要关闭吗？";
+            ? this.t('settings.telemetry_enable_message')
+            : this.t('settings.telemetry_disable_message');
         // 关闭时显示红色确认按钮，开启时显示普通按钮
         const isDanger = !checked;
-        const yes = await app.confirm(`确认${action}遥测`, message, isDanger);
+        const yes = await app.confirm(app.t('settings.telemetry_confirm_title', { action }), message, isDanger);
         if (yes) {
             toggle.checked = checked; // 用户确认，应用新状态
             await pywebview.api.set_telemetry_status(checked);
@@ -2829,19 +2896,19 @@ const app = {
         const toggle = document.getElementById('autostart-switch');
         if (!window.pywebview?.api?.set_autostart_status) {
             toggle.checked = !checked;
-            this.showAlert('错误', '后端连接未就绪', 'error');
+            this.showAlert(this.t('common.error'), this.t('common.backend_not_ready_short'), 'error');
             return;
         }
         try {
             const success = await pywebview.api.set_autostart_status(checked);
             if (!success) {
                 toggle.checked = !checked;
-                this.showAlert('错误', '设置开机自启动失败，请检查权限', 'error');
+                this.showAlert(this.t('common.error'), this.t('settings.autostart_failed'), 'error');
             }
         } catch (e) {
             toggle.checked = !checked;
             console.error('toggleAutostart failed:', e);
-            this.showAlert('错误', '设置失败: ' + e.message, 'error');
+            this.showAlert(this.t('common.error'), this.t('settings.set_failed', { message: e.message }), 'error');
         }
     },
 
@@ -2849,7 +2916,7 @@ const app = {
         const toggle = document.getElementById('tray-mode-switch');
         if (!window.pywebview?.api?.set_tray_mode_status) {
             toggle.checked = !checked;
-            this.showAlert('错误', '后端连接未就绪', 'error');
+            this.showAlert(this.t('common.error'), this.t('common.backend_not_ready_short'), 'error');
             return;
         }
         try {
@@ -2859,7 +2926,7 @@ const app = {
         } catch (e) {
             toggle.checked = !checked;
             console.error('toggleTrayMode failed:', e);
-            this.showAlert('错误', '设置失败: ' + e.message, 'error');
+            this.showAlert(this.t('common.error'), this.t('settings.set_failed', { message: e.message }), 'error');
         }
     },
 
@@ -2867,7 +2934,7 @@ const app = {
         const toggle = document.getElementById('close-confirm-switch');
         if (!window.pywebview?.api?.set_close_confirm_status) {
             toggle.checked = !checked;
-            this.showAlert('错误', '后端连接未就绪', 'error');
+            this.showAlert(this.t('common.error'), this.t('common.backend_not_ready_short'), 'error');
             return;
         }
         try {
@@ -2877,7 +2944,7 @@ const app = {
         } catch (e) {
             toggle.checked = !checked;
             console.error('toggleCloseConfirm failed:', e);
-            this.showAlert('错误', '设置失败: ' + e.message, 'error');
+            this.showAlert(this.t('common.error'), this.t('settings.set_failed', { message: e.message }), 'error');
         }
     },
 
@@ -3020,11 +3087,21 @@ const app = {
     },
 
     // --- 日志系统 ---
-    appendLog(htmlMsg) {
+    getLogClass(level, message) {
+        const normalizedLevel = String(level || '').toUpperCase();
+        const text = String(message || '');
+        if (normalizedLevel === 'ERROR' || text.includes('ERROR') || text.includes('错误')) return 'error';
+        if (normalizedLevel === 'SUCCESS' || text.includes('SUCCESS') || text.includes('成功')) return 'success';
+        if (normalizedLevel === 'WARN' || normalizedLevel === 'WARNING' || text.includes('WARN')) return 'warn';
+        if (normalizedLevel === 'SYS' || text.includes('SYS')) return 'sys';
+        return 'info';
+    },
+
+    appendLogMessage(message, forcedClass = null, allowHtml = false) {
         const container = document.getElementById('log-container');
         if (!container) return;
 
-        const normalizedMsg = String(htmlMsg || '').trim();
+        const normalizedMsg = String(message || '').trim();
         const now = Date.now();
 
         // 避免极短时间内同一条日志被重复追加到运行日志面板。
@@ -3050,17 +3127,25 @@ const app = {
         this._lastLogAt = now;
 
         const div = document.createElement('div');
-        // 根据内容简单判断颜色类
-        let cls = 'info';
-        if (htmlMsg.includes('ERROR') || htmlMsg.includes('错误')) cls = 'error';
-        else if (htmlMsg.includes('SUCCESS') || htmlMsg.includes('成功')) cls = 'success';
-        else if (htmlMsg.includes('WARN')) cls = 'warn';
-        else if (htmlMsg.includes('SYS')) cls = 'sys';
-
+        const cls = forcedClass || this.getLogClass('', message);
         div.className = `log-line ${cls}`;
-        div.innerHTML = htmlMsg; // 允许 <br>
+        if (allowHtml) {
+            div.innerHTML = message; // 兼容旧日志中的 <br>
+        } else {
+            div.textContent = message;
+        }
         container.appendChild(div);
         container.scrollTop = container.scrollHeight; // 自动滚动到底部
+    },
+
+    appendLog(htmlMsg) {
+        this.appendLogMessage(htmlMsg, null, true);
+    },
+
+    appendI18nLog(level, key, params = {}, prefix = '') {
+        const content = this.t(key, params || {});
+        const text = `${prefix || ''}${content}`;
+        this.appendLogMessage(text, this.getLogClass(level, text), false);
     },
 
     updateSearchLog(msg) {
@@ -3075,6 +3160,10 @@ const app = {
             container.appendChild(div);
         }
         container.scrollTop = container.scrollHeight;
+    },
+
+    updateSearchLogI18n(key, params = {}) {
+        this.updateSearchLog(this.t(key, params || {}));
     },
 
     clearLogs() {
@@ -3123,8 +3212,8 @@ const app = {
             listContainer.innerHTML = `
                 <div class="empty-state">
                     <i class="ri-error-warning-line"></i>
-                    <h3>加载失败</h3>
-                    <p>请检查后端连接状态: ${e.message}</p>
+                    <h3>${this.t('lib.load_failed')}</h3>
+                    <p>${this.t('lib.backend_status_check', { message: e.message })}</p>
                 </div>
             `;
         } finally {
@@ -3146,8 +3235,8 @@ const app = {
             listContainer.innerHTML = `
                 <div class="empty-state" style="grid-column: 1 / span 2; animation: cardEntrance 0.5s ease both;">
                     <i class="ri-search-line"></i>
-                    <h3>没有找到相关语音包</h3>
-                    <p>试试其他关键词，或导入新文件</p>
+                    <h3>${this.t('lib.no_search_result')}</h3>
+                    <p>${this.t('lib.try_other_keyword_or_import')}</p>
                 </div>`;
             return;
         }
@@ -3202,6 +3291,26 @@ const app = {
             const cls = String(value || '').trim();
             return /^[a-zA-Z0-9_-]+$/.test(cls) ? cls : fallback;
         };
+        const translate_or = (key, params = {}, fallback = '') => {
+            const text = this.t(key, params);
+            return text === key ? (fallback || key) : text;
+        };
+        const localize_lang = (lang) => {
+            const key_map = {
+                '多语言': 'mod.lang_multi',
+                '中': 'mod.lang_cn',
+                '美': 'mod.lang_us',
+                '英': 'mod.lang_uk',
+                '俄': 'mod.lang_ru',
+                '德': 'mod.lang_de',
+                '日': 'mod.lang_jp',
+                '法': 'mod.lang_fr',
+                '未识别': 'mod.lang_unknown',
+                '其他': 'mod.lang_other',
+            };
+            return translate_or(key_map[String(lang || '').trim()] || '', {}, lang);
+        };
+        const capability_label = (key, fallback) => translate_or(`mod.capability_${key}`, {}, fallback);
         const sanitizeCardUrl = (value) => {
             const raw = String(value || '').trim();
             if (!raw) return '';
@@ -3217,8 +3326,8 @@ const app = {
             return '';
         };
 
-        const titleText = String(mod?.title || '未命名语音包');
-        const authorText = String(mod?.author || '未知作者');
+        const titleText = String(mod?.title || translate_or('mod.untitled_voice_pack', {}, '未命名语音包'));
+        const authorText = String(mod?.author || translate_or('mod.unknown_author', {}, '未知作者'));
         const sizeText = String(mod?.size_str || '0 MB');
         const capabilities = (mod?.capabilities && typeof mod.capabilities === 'object') ? mod.capabilities : {};
         const imgUrl = sanitizeImageUrl(mod?.cover_url);
@@ -3229,18 +3338,18 @@ const app = {
             for (const [key, conf] of Object.entries(UI_CONFIG.tagMap)) {
                 if (capabilities[key]) {
                     const tagConf = conf || {};
-                    tagsHtml += `<span class="tag ${safeClass(tagConf.cls, 'default')}">${escapeHtml(tagConf.text)}</span>`;
+                    tagsHtml += `<span class="tag ${safeClass(tagConf.cls, 'default')}">${escapeHtml(capability_label(key, tagConf.text || key))}</span>`;
                 }
             }
         } else {
-            if (capabilities.tank) tagsHtml += `<span class="tag tank">陆战</span>`;
-            if (capabilities.air) tagsHtml += `<span class="tag air">空战</span>`;
-            if (capabilities.naval) tagsHtml += `<span class="tag naval">海战</span>`;
-            if (capabilities.radio) tagsHtml += `<span class="tag radio">无线电/局势</span>`;
-            if (capabilities.missile) tagsHtml += `<span class="tag missile">导弹音效</span>`;
-            if (capabilities.music) tagsHtml += `<span class="tag music">音乐包</span>`;
-            if (capabilities.noise) tagsHtml += `<span class="tag noise">降噪包</span>`;
-            if (capabilities.pilot) tagsHtml += `<span class="tag pilot">飞行员语音</span>`;
+            if (capabilities.tank) tagsHtml += `<span class="tag tank">${escapeHtml(capability_label('tank', '陆战'))}</span>`;
+            if (capabilities.air) tagsHtml += `<span class="tag air">${escapeHtml(capability_label('air', '空战'))}</span>`;
+            if (capabilities.naval) tagsHtml += `<span class="tag naval">${escapeHtml(capability_label('naval', '海战'))}</span>`;
+            if (capabilities.radio) tagsHtml += `<span class="tag radio">${escapeHtml(capability_label('radio', '无线电/局势'))}</span>`;
+            if (capabilities.missile) tagsHtml += `<span class="tag missile">${escapeHtml(capability_label('missile', '导弹音效'))}</span>`;
+            if (capabilities.music) tagsHtml += `<span class="tag music">${escapeHtml(capability_label('music', '音乐包'))}</span>`;
+            if (capabilities.noise) tagsHtml += `<span class="tag noise">${escapeHtml(capability_label('noise', '降噪包'))}</span>`;
+            if (capabilities.pilot) tagsHtml += `<span class="tag pilot">${escapeHtml(capability_label('pilot', '飞行员语音'))}</span>`;
         }
 
         let fullLangList = [];
@@ -3263,13 +3372,16 @@ const app = {
             if (typeof UI_CONFIG !== 'undefined' && UI_CONFIG.langMap && UI_CONFIG.langMap[lang]) {
                 cls = safeClass(UI_CONFIG.langMap[lang]);
             }
-            return `<span class="lang-text ${cls}">${escapeHtml(lang)}</span>`;
+            return `<span class="lang-text ${cls}">${escapeHtml(localize_lang(lang))}</span>`;
         }).join('<span style="margin:0 2px">/</span>');
 
         // 拼接悬停显示的完整列表
-        const langTooltip = fullLangList.length > 0 ? `支持语言: ${fullLangList.join(', ')}` : '未识别语言';
+        const localizedFullLangList = fullLangList.map(localize_lang);
+        const langTooltip = fullLangList.length > 0
+            ? translate_or('mod.supported_languages', { languages: localizedFullLangList.join(', ') }, `支持语言: ${localizedFullLangList.join(', ')}`)
+            : translate_or('mod.unknown_language', {}, '未识别语言');
 
-        const updateDate = String(mod?.date || "未知日期");
+        const updateDate = String(mod?.date || translate_or('mod.unknown_date', {}, '未知日期'));
 
         const videoUrl = sanitizeCardUrl(mod?.link_video);
         const wtLiveUrl = sanitizeCardUrl(mod?.link_wtlive);
@@ -3279,7 +3391,7 @@ const app = {
         const clsWt = wtLiveUrl ? 'wt' : 'disabled';
         const clsBili = biliUrl ? 'bili' : 'disabled';
 
-        const noteText = String(mod?.note || '暂无留言');
+        const noteText = String(mod?.note || translate_or('mod.no_message', {}, '暂无留言'));
 
         // 判断该语音包是否为当前已生效项
         const isInstalled = Array.isArray(app.installedModIds) && app.installedModIds.includes(safeModId);
@@ -3289,7 +3401,7 @@ const app = {
         // 未安装: 普通样式, play-circle 图标, title="加载此语音包"
         const loadBtnClass = isInstalled ? 'action-btn-load active' : 'action-btn-load';
         const loadBtnIcon = isInstalled ? 'ri-check-line' : 'ri-play-circle-line';
-        const loadBtnTitle = isInstalled ? '当前已生效' : '加载此语音包';
+        const loadBtnTitle = isInstalled ? this.t('lib.current_loaded') : this.t('lib.load_voice_pack');
 
         // 处理版本号显示，避免出现 vv2.53 的情况
         let displayVersion = String(mod?.version || "1.0");
@@ -3301,7 +3413,7 @@ const app = {
             mod.files.map(f => {
                 const fileCls = safeClass(f?.cls || 'default', 'default');
                 const fileType = String(f?.type || '');
-                return `<span class="tag ${fileCls}" title="包含模块: ${escapeHtml(fileType)}">${escapeHtml(fileType)}</span>`;
+                return `<span class="tag ${fileCls}" title="${escapeHtml(translate_or('mod.contains_module', { module: fileType }, `包含模块: ${fileType}`))}">${escapeHtml(fileType)}</span>`;
             }).join('')
             : tagsHtml;
 
@@ -3325,7 +3437,7 @@ const app = {
                     
                     <div class="mod-lang-wrap" title="${escapeHtml(langTooltip)}" style="display:inline-flex; align-items:center; cursor:help;">
                         <i class="ri-translate"></i> 
-                        <span style="margin-left:2px">${langHtml || '未识别'}</span>
+                        <span style="margin-left:2px">${langHtml || escapeHtml(localize_lang('未识别'))}</span>
                     </div>
                 </div>
 
@@ -3334,7 +3446,7 @@ const app = {
                 </div>
                 
                 <div style="font-size:11px; color:var(--text-log); opacity:0.6; margin: 6px 0 8px; display:flex; align-items:center; gap:4px;">
-                    <i class="ri-time-line"></i> 更新于: ${escapeHtml(updateDate)}
+                    <i class="ri-time-line"></i> ${escapeHtml(translate_or('mod.updated_at', { date: updateDate }, `更新于: ${updateDate}`))}
                 </div>
 
                 <div class="mod-note">
@@ -3343,27 +3455,27 @@ const app = {
                 </div>
             </div>
 
-            <button class="mod-copy-action" title="复制国籍文件">
+            <button class="mod-copy-action" title="${escapeHtml(translate_or('mod.copy_country_title', {}, '复制国籍文件'))}">
                 <i class="ri-file-copy-line"></i>
             </button>
 
             <div class="mod-actions-col">
-                <div class="action-icon action-btn-del-dropdown" data-action="delete-menu" title="删除选项">
+                <div class="action-icon action-btn-del-dropdown" data-action="delete-menu" title="${escapeHtml(translate_or('mod.delete_options', {}, '删除选项'))}">
                     <i class="ri-delete-bin-line"></i>
                     <i class="ri-arrow-down-s-line" style="font-size: 12px; margin-left: -2px;"></i>
                 </div>
 
                 <div style="flex:1"></div>
 
-                <div class="action-icon ${clsVideo}" data-action="open-link" data-url="${escapeHtml(videoUrl)}" title="观看介绍视频">
+                <div class="action-icon ${clsVideo}" data-action="open-link" data-url="${escapeHtml(videoUrl)}" title="${escapeHtml(translate_or('mod.watch_video', {}, '观看介绍视频'))}">
                     <i class="ri-play-circle-line"></i>
                 </div>
 
-                <div class="action-icon ${clsWt}" data-action="open-link" data-url="${escapeHtml(wtLiveUrl)}" title="访问 WT Live 页面">
+                <div class="action-icon ${clsWt}" data-action="open-link" data-url="${escapeHtml(wtLiveUrl)}" title="${escapeHtml(translate_or('mod.visit_wt_live', {}, '访问 WT Live 页面'))}">
                     <i class="ri-global-line"></i>
                 </div>
 
-                <div class="action-icon ${clsBili}" data-action="open-link" data-url="${escapeHtml(biliUrl)}" title="访问 Bilibili">
+                <div class="action-icon ${clsBili}" data-action="open-link" data-url="${escapeHtml(biliUrl)}" title="${escapeHtml(translate_or('mod.visit_bilibili', {}, '访问 Bilibili'))}">
                     <i class="ri-bilibili-line"></i>
                 </div>
 
@@ -3453,7 +3565,9 @@ const app = {
         const input = document.getElementById('copy-country-code');
         if (!modal || !input) return;
         if (titleEl) {
-            titleEl.textContent = modTitle ? `复制国籍文件 - ${modTitle}` : '复制国籍文件';
+            titleEl.textContent = modTitle
+                ? this.t('copy_country.title_with_mod', { title: modTitle })
+                : this.t('copy_country.title');
         }
         input.value = '';
         modal.classList.remove('hiding');
@@ -3464,21 +3578,21 @@ const app = {
         const input = document.getElementById('copy-country-code');
         const code = String(input?.value || '').trim().toLowerCase();
         if (!this.currentCopyModId) {
-            this.showAlert('错误', '未选中语音包', 'error');
+            this.showAlert(this.t('common.error'), this.t('copy_country.no_mod'), 'error');
             return;
         }
         if (!code) {
-            this.showAlert('错误', '请输入国家缩写', 'error');
+            this.showAlert(this.t('common.error'), this.t('copy_country.code_required'), 'error');
             return;
         }
         if (!/^[a-z]{2,10}$/.test(code)) {
-            this.showAlert('错误', '国家缩写仅支持 2-10 位英文字母', 'error');
+            this.showAlert(this.t('common.error'), this.t('copy_country.code_invalid'), 'error');
             return;
         }
         const includeGround = mode ? mode === 'ground' : true;
         const includeRadio = mode ? mode === 'radio' : true;
         if (!includeGround && !includeRadio) {
-            this.showAlert('错误', '至少勾选一种类型', 'error');
+            this.showAlert(this.t('common.error'), this.t('copy_country.type_required'), 'error');
             return;
         }
         try {
@@ -3492,13 +3606,17 @@ const app = {
                 const created = (res.created || []).length;
                 const skipped = (res.skipped || []).length;
                 const missing = (res.missing || []).length;
-                this.showAlert('成功', `已复制 ${created} 个文件${skipped ? `，跳过 ${skipped}` : ''}${missing ? `，缺失 ${missing}` : ''}`, 'success');
+                this.showAlert(this.t('common.success'), this.t('copy_country.copied', {
+                    created,
+                    skipped: skipped ? this.t('copy_country.skipped', { count: skipped }) : '',
+                    missing: missing ? this.t('copy_country.missing', { count: missing }) : ''
+                }), 'success');
                 if (modal) this.closeModal('modal-copy-country');
             } else {
-                this.showAlert('失败', res?.msg || '复制失败', 'error');
+                this.showAlert(this.t('common.failure'), res?.msg || this.t('copy_country.copy_failed'), 'error');
             }
         } catch (e) {
-            this.showAlert('错误', `调用失败: ${e}`, 'error');
+            this.showAlert(this.t('common.error'), this.t('copy_country.call_failed', { message: e }), 'error');
         }
     },
 
@@ -3524,7 +3642,7 @@ const app = {
     openFolder(type) {
         if (type === 'game' || type === 'userskins' || type === 'user_missions') {
             if (!this.currentGamePath) {
-                app.showAlert("提示", "请先在主页设置游戏路径！");
+                app.showAlert(this.t("common.info"), this.t("home.path_required"));
                 this.switchTab('home');
                 return;
             }
@@ -3561,7 +3679,7 @@ const app = {
         }
         const scheme = (finalUrl.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/) || [])[1]?.toLowerCase();
         if (!['http', 'https', 'mailto'].includes(scheme)) {
-            if (typeof app.showToast === 'function') app.showToast('已拦截不支持的链接协议', 'warning');
+            if (typeof app.showToast === 'function') app.showToast(this.t('common.unsupported_link_protocol'), 'warning');
             return;
         }
         try {
@@ -3595,7 +3713,7 @@ const app = {
         if (!modal || !img) return;
 
         img.src = src;
-        if (titleEl) titleEl.textContent = title || '图片预览';
+        if (titleEl) titleEl.textContent = title || this.t('modal.image_preview');
 
         modal.classList.remove('hiding');
         modal.classList.add('show');
@@ -3620,8 +3738,8 @@ const app = {
 
     async deleteMod(modId) {
         const yes = await app.confirm(
-            '删除确认',
-            `确定要永久删除语音包 <strong>[${modId}]</strong> 吗？<br>此操作不可撤销。`,
+            this.t('lib.delete_confirm_title'),
+            this.t('lib.delete_confirm_message', { id: modId }),
             true
         );
         if (yes) {
@@ -3635,7 +3753,7 @@ const app = {
 
             const result = await pywebview.api.delete_mod(modId);
             if (result && result.success) {
-                app.showToast(result.msg || '已从库中删除', 'success');
+                app.showToast(result.msg || this.t('lib.delete_from_library'), 'success');
 
                 // 更新已安装列表
                 try {
@@ -3649,7 +3767,7 @@ const app = {
                 // 强制刷新库列表以更新卡片状态
                 this.refreshLibrary({ manual: true });
             } else {
-                app.showToast(result?.msg || '删除失败', 'error');
+                app.showToast(result?.msg || this.t('lib.delete_failed'), 'error');
             }
         }
     },
@@ -4008,7 +4126,7 @@ app.modCache = [];
 // 真正的打开模态框
 app.openInstallModal = async function (modId) {
     if (!app.currentGamePath) {
-        app.showAlert("提示", "请先设置游戏路径！");
+        app.showAlert(app.t("common.info"), app.t("home.path_required"));
         app.switchTab('home');
         return;
     }
@@ -4021,9 +4139,22 @@ app.openInstallModal = async function (modId) {
     container.innerHTML = '';
 
     const fileGroups = mod.files || [];
+    const moduleLabel = (group) => {
+        const code = String(group?.code || '').toLowerCase();
+        const type = String(group?.type || '');
+        if (code.includes('ground') || code.includes('tank') || type.includes('陆战语音')) return app.t('install.module_ground_voice');
+        if (code.includes('common') || code.includes('dialogs_chat') || type.includes('无线电')) return app.t('install.module_radio');
+        if (code.includes('aircraft') || type.includes('空战音效')) return app.t('install.module_air_sfx');
+        if (code.includes('ships') || code.includes('naval') || type.includes('海战音效')) return app.t('install.module_naval_sfx');
+        if (code.includes('infantry') || type.includes('步兵')) return app.t('install.module_infantry');
+        if (code.includes('masterbank') || type.includes('降噪包')) return app.t('install.module_noise');
+        if (code.includes('preview') || type.includes('试听')) return app.t('install.module_preview');
+        if (type.includes('陆战音效')) return app.t('install.module_ground_sfx');
+        return type;
+    };
 
     if (fileGroups.length === 0) {
-        container.innerHTML = '<div class="no-folders" style="padding:20px;text-align:center;color:#888;">⚠️ 未检测到有效语音文件</div>';
+        container.innerHTML = `<div class="no-folders" style="padding:20px;text-align:center;color:#888;">⚠️ ${app._escapeHtml(app.t('install.no_valid_audio_files'))}</div>`;
     } else {
         fileGroups.forEach(group => {
             const div = document.createElement('div');
@@ -4046,7 +4177,7 @@ app.openInstallModal = async function (modId) {
             div.dataset.files = JSON.stringify(group.files); // 存储文件列表
 
             // 显示名称和文件数量
-            const displayName = group.type;
+            const displayName = moduleLabel(group);
             const fileCount = group.count;
 
             // 根据类型选择图标
@@ -4080,7 +4211,7 @@ app.openInstallModal = async function (modId) {
                 iconClass = "ri-headphone-line";
             }
 
-            div.innerHTML = `<i class="${iconClass}"></i><div class="label">${displayName}${isPreview ? ' <span style="color:var(--text-sec);font-size:10px;">(禁用)</span>' : ''} <span style="opacity:0.6;font-size:11px;">(${fileCount})</span></div>`;
+            div.innerHTML = `<i class="${iconClass}"></i><div class="label">${app._escapeHtml(displayName)}${isPreview ? ` <span style="color:var(--text-sec);font-size:10px;">(${app._escapeHtml(app.t('install.disabled'))})</span>` : ''} <span style="opacity:0.6;font-size:11px;">(${fileCount})</span></div>`;
 
             if (!isPreview) {
                 div.onclick = () => {
@@ -4088,12 +4219,12 @@ app.openInstallModal = async function (modId) {
                 };
 
                 // Tooltip 交互
-                const tooltipText = `${displayName}\n包含 ${fileCount} 个文件`;
+                const tooltipText = app.t('install.contains_files', { name: displayName, count: fileCount });
                 div.onmouseenter = (e) => app.showTooltip(div, tooltipText);
                 div.onmouseleave = () => app.hideTooltip();
             } else {
                 // 试听语音包的提示
-                const tooltipText = `试听语音包不可安装\n仅用于预览效果`;
+                const tooltipText = app.t('install.preview_not_installable');
                 div.onmouseenter = (e) => app.showTooltip(div, tooltipText);
                 div.onmouseleave = () => app.hideTooltip();
             }
@@ -4597,10 +4728,22 @@ app.showContextMenu = function (event, menuItems) {
             menuItem.style.background = 'transparent';
         });
 
-        menuItem.addEventListener('click', () => {
+        menuItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             menu.remove();
             if (item.action) {
-                item.action();
+                const handleActionError = (error) => {
+                    console.error('context menu action failed:', error);
+                    if (app && typeof app.showToast === 'function') {
+                        app.showToast(app.t('common.operation_failed', { message: error?.message || error || '' }), 'error');
+                    }
+                };
+                try {
+                    Promise.resolve(item.action()).catch(handleActionError);
+                } catch (error) {
+                    handleActionError(error);
+                }
             }
         });
 
@@ -4676,6 +4819,7 @@ app.switchResourceView = function (target) {
     // 检查是否是新模块系统注册的页面
     const registeredPage = this.resourcePages[target];
     if (registeredPage) {
+        const wasInitialized = !!registeredPage._initialized;
         // 无论当前是否已有注册页，都先隐藏原生视图，避免与注册页叠层显示
         document.querySelectorAll('.resource-view').forEach(view => {
             view.classList.remove('active');
@@ -4689,11 +4833,14 @@ app.switchResourceView = function (target) {
         }
 
         // 初始化并显示新页面（如果未初始化）
-        if (!registeredPage._initialized) {
+        if (!wasInitialized) {
             registeredPage.init();
             registeredPage._initialized = true;
         }
         registeredPage.show();
+        if (wasInitialized && typeof this.refreshResourcePageI18n === 'function') {
+            this.refreshResourcePageI18n(registeredPage);
+        }
         this.currentResourcePage = registeredPage;
         return;
     }
@@ -4717,7 +4864,7 @@ app.switchResourceView = function (target) {
     }
 
     if (target === 'skins') {
-        if (!this._skinsLoaded) this.refreshSkins();
+        this.ensureCamoResourceLoaded();
     } else if (target === 'sights') {
         if (!this._sightsLoaded) this.loadSightsView();
     } else if (target === 'tasks') {
@@ -4794,6 +4941,44 @@ app.updateAllResourceSelectionSummaries = function () {
     ['skins', 'sights', 'tasks', 'models', 'hangar'].forEach((resource_type) => {
         this.updateResourceSelectionSummary(resource_type);
     });
+};
+
+app.refreshResourcePageI18n = function (page_module) {
+    if (!page_module) return;
+    if (page_module._refreshing && !page_module._loaded) return;
+    if (typeof page_module.refresh_i18n === 'function') {
+        page_module.refresh_i18n();
+        return;
+    }
+    if (typeof page_module._render_filtered_list === 'function') {
+        page_module._render_filtered_list();
+    }
+};
+
+app.refreshDynamicI18n = function () {
+    const lib_page = document.getElementById('page-lib');
+    if (lib_page?.classList.contains('active') && this._libraryLoaded && Array.isArray(this.modCache) && typeof this.renderList === 'function') {
+        const search_input = document.querySelector('#page-lib [data-i18n-placeholder="lib.search_placeholder"]');
+        const term = String(search_input?.value || '').toLowerCase().trim();
+        const mods = term
+            ? this.modCache.filter(mod => {
+                const title = String(mod?.title || '').toLowerCase();
+                const author = String(mod?.author || '').toLowerCase();
+                return title.includes(term) || author.includes(term);
+            })
+            : this.modCache;
+        this.renderList(mods);
+    }
+
+    const camo_page_active = document.getElementById('page-camo')?.classList.contains('active');
+    if (camo_page_active && document.getElementById('view-skins')?.classList.contains('active') && typeof this._renderSkinsView === 'function' && !(this._skinsRefreshing && !this._skinsLoaded)) {
+        this._renderSkinsView();
+    }
+    if (camo_page_active && document.getElementById('view-sights')?.classList.contains('active') && typeof this._renderSightsView === 'function' && !(this._sightsRefreshing && !this._sightsLoaded)) {
+        this._renderSightsView();
+    }
+
+    this.refreshResourcePageI18n(this.currentResourcePage);
 };
 
 app.initResourceSortDropdowns = function () {
@@ -4884,6 +5069,7 @@ app.switchResourceViewMode = function (resource_type, mode) {
 app.resource_ops_config = {
     skins: {
         label: '涂装',
+        label_key: 'resource.label_skins',
         open_api: 'open_skin_folder_by_name',
         enable_api: 'enable_skin',
         disable_api: 'disable_skin',
@@ -4892,6 +5078,7 @@ app.resource_ops_config = {
     },
     sights: {
         label: '炮镜',
+        label_key: 'resource.label_sights',
         open_api: 'open_sight_folder_by_name',
         enable_api: 'enable_sight',
         disable_api: 'disable_sight',
@@ -4900,6 +5087,7 @@ app.resource_ops_config = {
     },
     tasks: {
         label: '任务',
+        label_key: 'resource.label_tasks',
         open_api: 'open_task_folder_by_name',
         enable_api: 'enable_task',
         disable_api: 'disable_task',
@@ -4910,6 +5098,7 @@ app.resource_ops_config = {
     },
     models: {
         label: '模型',
+        label_key: 'resource.label_models',
         open_api: 'open_model_folder_by_name',
         enable_api: 'enable_model',
         disable_api: 'disable_model',
@@ -4920,6 +5109,7 @@ app.resource_ops_config = {
     },
     hangar: {
         label: '机库',
+        label_key: 'resource.label_hangar',
         open_api: 'open_hangar_folder_by_name',
         enable_api: 'enable_hangar',
         disable_api: 'disable_hangar',
@@ -4928,6 +5118,11 @@ app.resource_ops_config = {
             if (typeof Hangar !== 'undefined') return Hangar.refresh_list({ manual: true });
         }
     }
+};
+
+app.get_resource_label = function (config) {
+    if (!config) return '';
+    return config.label_key ? this.t(config.label_key) : String(config.label || '');
 };
 
 app.updateResourceSelectionSummary = function (resource_type, total_count) {
@@ -5009,12 +5204,12 @@ app.open_selected_resource_folder = async function (resource_type) {
     if (selected.length !== 1) return;
     const api_fn = config && window.pywebview?.api?.[config.open_api];
     if (!api_fn) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
     const result = await window.pywebview.api[config.open_api](selected[0].name);
     if (!result || !result.success) {
-        this.showAlert('错误', result?.msg || `打开${config.label}文件夹失败`, 'error');
+        this.showAlert(this.t('common.error'), result?.msg || this.t('resource.open_failed', { label: this.get_resource_label(config) }), 'error');
     }
 };
 
@@ -5025,13 +5220,13 @@ app.enable_selected_resources = async function (resource_type) {
     if (!selected.length) return;
     const api_fn = config && window.pywebview?.api?.[config.enable_api];
     if (!api_fn) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
     for (const item of selected) {
         const result = await window.pywebview.api[config.enable_api](item.name);
         if (!result || !result.success) {
-            this.showAlert('错误', result?.msg || `启用失败: ${item.name}`, 'error');
+            this.showAlert(this.t('common.error'), result?.msg || this.t('resource.enable_failed', { name: item.name }), 'error');
             return;
         }
     }
@@ -5045,13 +5240,13 @@ app.disable_selected_resources = async function (resource_type) {
     if (!selected.length) return;
     const api_fn = config && window.pywebview?.api?.[config.disable_api];
     if (!api_fn) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
     for (const item of selected) {
         const result = await window.pywebview.api[config.disable_api](item.name);
         if (!result || !result.success) {
-            this.showAlert('错误', result?.msg || `禁用失败: ${item.name}`, 'error');
+            this.showAlert(this.t('common.error'), result?.msg || this.t('resource.disable_failed', { name: item.name }), 'error');
             return;
         }
     }
@@ -5065,21 +5260,22 @@ app.delete_selected_resources = async function (resource_type) {
     if (!selected.length) return;
     const api_fn = config && window.pywebview?.api?.[config.delete_api];
     if (!api_fn) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
     const names = selected.map(item => app._escapeHtml(item.name)).join('<br>');
+    const label = this.get_resource_label(config);
     const yes = await this.confirm(
-        `删除${config.label}`,
-        `确定要永久删除选中的 ${selected.length} 个${config.label}文件夹吗？<br><br>${names}<br><br>此操作不可撤销。`,
+        this.t('resource.delete_title', { label }),
+        this.t('resource.delete_message', { count: selected.length, label, names }),
         true,
-        '确认删除'
+        this.t('resource.confirm_delete')
     );
     if (!yes) return;
     for (const item of selected) {
         const result = await window.pywebview.api[config.delete_api](item.name);
         if (!result || !result.success) {
-            this.showAlert('错误', result?.msg || `删除失败: ${item.name}`, 'error');
+            this.showAlert(this.t('common.error'), result?.msg || this.t('resource.delete_failed', { name: item.name }), 'error');
             return;
         }
     }
@@ -5280,7 +5476,7 @@ app.onSightsUidChange = async function (uid) {
     if (!uid) return;
 
     if (!window.pywebview?.api?.select_uid_sights_path) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5290,19 +5486,19 @@ app.onSightsUidChange = async function (uid) {
             this.sightsPath = result.path;
             this._sightsLoaded = false;
             this.loadSightsView();
-            this.showInfoToast('已设置', `UID ${uid} 的炮镜路径已设置`);
+            this.showInfoToast(this.t('settings.saved'), this.t('resource.uid_path_set', { uid }));
         } else {
-            this.showAlert('错误', result?.error || '设置失败', 'error');
+            this.showAlert(this.t('common.error'), result?.error || this.t('common.save_failed'), 'error');
         }
     } catch (e) {
         console.error(e);
-        this.showAlert('错误', '选择 UID 失败: ' + e.message, 'error');
+        this.showAlert(this.t('common.error'), this.t('resource.uid_select_failed', { message: e.message }), 'error');
     }
 };
 
 app.selectSightsPath = async function () {
     if (!window.pywebview?.api?.select_sights_path) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5312,11 +5508,11 @@ app.selectSightsPath = async function () {
             this.sightsPath = result.path;
             this._sightsLoaded = false;
             this.loadSightsView();
-            this.showAlert('成功', '炮镜路径设置成功！', 'success');
+            this.showAlert(this.t('common.success'), this.t('tools.sights_path_success'), 'success');
         }
     } catch (e) {
         console.error(e);
-        this.showAlert('错误', '选择路径失败: ' + e.message, 'error');
+        this.showAlert(this.t('common.error'), this.t('common.select_path_failed', { message: e.message }), 'error');
     }
 };
 
@@ -5328,7 +5524,7 @@ app.changeSightsPath = function () {
 
 app.openSightsFolder = async function () {
     if (!this.sightsPath) {
-        this.showAlert('提示', '请先选择炮镜文件夹', 'warn');
+        this.showAlert(this.t('common.info'), this.t('tools.select_sights_path'), 'warn');
         return;
     }
 
@@ -5542,7 +5738,7 @@ app._renderSightsView = function () {
         const disabledLabel = app._escapeHtml(app.t('resource.status_disabled'));
         const cardTitle = app._escapeHtml(displayName === folderName
             ? String(item.path || "")
-            : `${displayName}\n原始文件夹名: ${folderName}\n${item.path || ""}`);
+            : `${displayName}\n${app.t('resource.original_folder_title', { name: folderName })}\n${item.path || ""}`);
         const encodedName = encodeURIComponent(folderName);
         return `
             <div class="small-card${isDisabled ? ' is-disabled-resource' : ''}" title="${cardTitle}" data-sight-name-encoded="${encodedName}" data-disabled="${isDisabled ? '1' : '0'}">
@@ -5560,7 +5756,7 @@ app._renderSightsView = function () {
                 <div class="small-card-body">
                     <div class="small-card-title" title="${safeDisplayName}">${safeDisplayName}</div>
                     <div class="small-card-meta">
-                        <span><i class="ri-file-list-3-line"></i> ${item.file_count} 文件</span>
+                        <span><i class="ri-file-list-3-line"></i> ${app._escapeHtml(app.t('resource.file_count', { count: item.file_count }))}</span>
                     </div>
                 </div>
             </div>
@@ -5577,8 +5773,8 @@ app.loadLibraryPathInfo = async function () {
     // 检查 API 是否可用
     if (!window.pywebview || !window.pywebview.api || typeof window.pywebview.api.get_library_path_info !== 'function') {
         console.warn('loadLibraryPathInfo: API not ready');
-        if (pendingInput) pendingInput.placeholder = '等待后端连接...';
-        if (libraryInput) libraryInput.placeholder = '等待后端连接...';
+        if (pendingInput) pendingInput.placeholder = this.t('settings.backend_waiting');
+        if (libraryInput) libraryInput.placeholder = this.t('settings.backend_waiting');
         return;
     }
 
@@ -5593,7 +5789,7 @@ app.loadLibraryPathInfo = async function () {
                 pendingInput.title = info.custom_pending_dir;
             } else {
                 pendingInput.value = '';
-                pendingInput.placeholder = info.default_pending_dir || '使用默认路径';
+                pendingInput.placeholder = info.default_pending_dir || this.t('settings.use_default_path');
                 pendingInput.title = info.default_pending_dir || '';
             }
         }
@@ -5603,20 +5799,20 @@ app.loadLibraryPathInfo = async function () {
                 libraryInput.title = info.custom_library_dir;
             } else {
                 libraryInput.value = '';
-                libraryInput.placeholder = info.default_library_dir || '使用默认路径';
+                libraryInput.placeholder = info.default_library_dir || this.t('settings.use_default_path');
                 libraryInput.title = info.default_library_dir || '';
             }
         }
     } catch (e) {
         console.error('加载语音包库路径信息失败:', e);
-        if (pendingInput) pendingInput.placeholder = '加载失败';
-        if (libraryInput) libraryInput.placeholder = '加载失败';
+        if (pendingInput) pendingInput.placeholder = this.t('settings.load_failed');
+        if (libraryInput) libraryInput.placeholder = this.t('settings.load_failed');
     }
 };
 
 app.browsePendingDir = async function () {
     if (!window.pywebview?.api?.select_pending_dir) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5632,13 +5828,13 @@ app.browsePendingDir = async function () {
         }
     } catch (e) {
         console.error(e);
-        this.showAlert('错误', '选择路径失败: ' + e.message, 'error');
+        this.showAlert(this.t('common.error'), this.t('common.select_path_failed', { message: e.message }), 'error');
     }
 };
 
 app.browseLibraryDir = async function () {
     if (!window.pywebview?.api?.select_library_dir) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5654,13 +5850,13 @@ app.browseLibraryDir = async function () {
         }
     } catch (e) {
         console.error(e);
-        this.showAlert('错误', '选择路径失败: ' + e.message, 'error');
+        this.showAlert(this.t('common.error'), this.t('common.select_path_failed', { message: e.message }), 'error');
     }
 };
 
 app.openPendingFolder = async function () {
     if (!window.pywebview?.api?.open_pending_folder) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5668,13 +5864,13 @@ app.openPendingFolder = async function () {
         await pywebview.api.open_pending_folder();
     } catch (e) {
         console.error(e);
-        this.showAlert('错误', '打开文件夹失败: ' + e.message, 'error');
+        this.showAlert(this.t('common.error'), this.t('common.open_folder_failed', { message: e.message }), 'error');
     }
 };
 
 app.openLibraryFolder = async function () {
     if (!window.pywebview?.api?.open_library_folder) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5682,13 +5878,13 @@ app.openLibraryFolder = async function () {
         await pywebview.api.open_library_folder();
     } catch (e) {
         console.error(e);
-        this.showAlert('错误', '打开文件夹失败: ' + e.message, 'error');
+        this.showAlert(this.t('common.error'), this.t('common.open_folder_failed', { message: e.message }), 'error');
     }
 };
 
 app.saveLibraryPaths = async function () {
     if (!window.pywebview?.api?.save_pending_dir || !window.pywebview?.api?.save_library_dir) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5700,17 +5896,17 @@ app.saveLibraryPaths = async function () {
     try {
         const pendingRes = await pywebview.api.save_pending_dir(pendingDir);
         if (!pendingRes || !pendingRes.success) {
-            this.showErrorToast('保存失败', pendingRes?.msg || '保存失败');
+            this.showErrorToast(this.t('common.save_failed'), pendingRes?.msg || this.t('common.save_failed'));
             return;
         }
 
         const libraryRes = await pywebview.api.save_library_dir(libraryDir);
         if (!libraryRes || !libraryRes.success) {
-            this.showErrorToast('保存失败', libraryRes?.msg || '保存失败');
+            this.showErrorToast(this.t('common.save_failed'), libraryRes?.msg || this.t('common.save_failed'));
             return;
         }
 
-        this.showInfoToast('已保存', '路径设置已保存');
+        this.showInfoToast(this.t('settings.saved'), this.t('settings.path_saved'));
         // 重新加载路径信息以更新 placeholder
         await this.loadLibraryPathInfo();
         // 刷新语音包库列表
@@ -5719,33 +5915,33 @@ app.saveLibraryPaths = async function () {
         }
     } catch (e) {
         console.error(e);
-        this.showErrorToast('保存失败', '保存失败: ' + e.message);
+        this.showErrorToast(this.t('common.save_failed'), this.t('common.operation_failed', { message: e.message }));
     }
 };
 
 app.resetLibraryPaths = async function () {
     if (!window.pywebview?.api?.save_pending_dir || !window.pywebview?.api?.save_library_dir) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
     // 确认重置
     const confirmed = await this.showConfirmDialog(
-        '重置路径',
-        '确定要将待解压区和语音包库路径重置为默认值吗？'
+        this.t('settings.reset_paths_title'),
+        this.t('settings.reset_paths_message')
     );
     if (!confirmed) return;
 
     try {
         const pendingRes = await pywebview.api.save_pending_dir('');
         if (!pendingRes || !pendingRes.success) {
-            this.showErrorToast('重置失败', pendingRes?.msg || '重置失败');
+            this.showErrorToast(this.t('common.reset_failed'), pendingRes?.msg || this.t('common.reset_failed'));
             return;
         }
 
         const libraryRes = await pywebview.api.save_library_dir('');
         if (!libraryRes || !libraryRes.success) {
-            this.showErrorToast('重置失败', libraryRes?.msg || '重置失败');
+            this.showErrorToast(this.t('common.reset_failed'), libraryRes?.msg || this.t('common.reset_failed'));
             return;
         }
 
@@ -5755,7 +5951,7 @@ app.resetLibraryPaths = async function () {
         if (pendingInput) pendingInput.value = '';
         if (libraryInput) libraryInput.value = '';
 
-        this.showInfoToast('已重置', '路径已重置为默认值');
+        this.showInfoToast(this.t('settings.reset_done'), this.t('settings.path_reset'));
         // 重新加载以更新 placeholder
         await this.loadLibraryPathInfo();
         // 刷新语音包库列表
@@ -5764,7 +5960,7 @@ app.resetLibraryPaths = async function () {
         }
     } catch (e) {
         console.error(e);
-        this.showErrorToast('重置失败', '重置失败: ' + e.message);
+        this.showErrorToast(this.t('common.reset_failed'), this.t('common.operation_failed', { message: e.message }));
     }
 };
 
@@ -5774,8 +5970,8 @@ app.copyPathToClipboard = async function (inputId) {
     if (!input) return;
 
     const path = input.value || input.placeholder;
-    if (!path || path === '使用默认路径' || path === '等待后端连接...') {
-        this.showInfoToast('提示', '没有可复制的路径');
+    if (!path || path === this.t('settings.use_default_path') || path === this.t('settings.backend_waiting')) {
+        this.showInfoToast(this.t('common.info'), this.t('settings.copy_no_path'));
         return;
     }
 
@@ -5789,17 +5985,17 @@ app.copyPathToClipboard = async function (inputId) {
             setTimeout(() => btn.classList.remove('copied'), 1500);
         }
 
-        this.showInfoToast('已复制', '路径已复制到剪贴板');
+        this.showInfoToast(this.t('settings.saved'), this.t('settings.copy_success'));
     } catch (e) {
         console.error('复制失败:', e);
-        this.showErrorToast('复制失败', '无法访问剪贴板');
+        this.showErrorToast(this.t('settings.copy_failed'), this.t('settings.copy_failed'));
     }
 };
 
 // 单独重置待解压区路径
 app.resetPendingDir = async function () {
     if (!window.pywebview?.api?.save_pending_dir) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5811,24 +6007,24 @@ app.resetPendingDir = async function () {
             if (pendingInput) {
                 pendingInput.value = '';
             }
-            this.showInfoToast('已重置', '待解压区路径已重置为默认值');
+            this.showInfoToast(this.t('settings.reset_done'), this.t('settings.pending_path_reset'));
             await this.loadLibraryPathInfo();
             if (typeof this.refreshLibrary === 'function') {
                 this.refreshLibrary();
             }
         } else {
-            this.showErrorToast('重置失败', result.msg || '重置失败');
+            this.showErrorToast(this.t('common.reset_failed'), result.msg || this.t('common.reset_failed'));
         }
     } catch (e) {
         console.error(e);
-        this.showErrorToast('重置失败', '重置失败: ' + e.message);
+        this.showErrorToast(this.t('common.reset_failed'), this.t('common.operation_failed', { message: e.message }));
     }
 };
 
 // 单独重置语音包库路径
 app.resetLibraryDir = async function () {
     if (!window.pywebview?.api?.save_library_dir) {
-        this.showAlert('错误', '功能未就绪，请检查后端连接', 'error');
+        this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
         return;
     }
 
@@ -5840,17 +6036,17 @@ app.resetLibraryDir = async function () {
             if (libraryInput) {
                 libraryInput.value = '';
             }
-            this.showInfoToast('已重置', '语音包库路径已重置为默认值');
+            this.showInfoToast(this.t('settings.reset_done'), this.t('settings.library_path_reset'));
             await this.loadLibraryPathInfo();
             if (typeof this.refreshLibrary === 'function') {
                 this.refreshLibrary();
             }
         } else {
-            this.showErrorToast('重置失败', result.msg || '重置失败');
+            this.showErrorToast(this.t('common.reset_failed'), result.msg || this.t('common.reset_failed'));
         }
     } catch (e) {
         console.error(e);
-        this.showErrorToast('重置失败', '重置失败: ' + e.message);
+        this.showErrorToast(this.t('common.reset_failed'), this.t('common.operation_failed', { message: e.message }));
     }
 };
 
@@ -5870,7 +6066,7 @@ app.showConfirmDialog = function (title, message) {
 
         titleEl.textContent = title;
         msgEl.innerHTML = message;
-        okBtn.innerHTML = '<i class="ri-check-line"></i> 确认';
+        okBtn.innerHTML = `<i class="ri-check-line"></i> ${this.t('common.confirm')}`;
         okBtn.className = 'btn primary';
 
         const cleanup = () => {
@@ -5988,6 +6184,19 @@ app.setupGlobalDragDrop = function () {
         return window.app || null;
     }
 
+    function tr(key, params = {}, fallback = '') {
+        const app = getApp();
+        if (app && typeof app.t === 'function') {
+            const text = app.t(key, params);
+            if (text !== key) return text;
+        }
+        if (window.I18N && typeof I18N.t === 'function') {
+            const text = I18N.t(key, params);
+            if (text !== key) return text;
+        }
+        return fallback || key;
+    }
+
     function escapeHtml(value) {
         const app = getApp();
         if (app && typeof app._escapeHtml === 'function') return app._escapeHtml(value);
@@ -6011,13 +6220,33 @@ app.setupGlobalDragDrop = function () {
         return ['多语言'];
     }
 
+    function localizeLanguageLabel(lang) {
+        const keyMap = {
+            '多语言': 'mod.lang_multi',
+            '中': 'mod.lang_cn',
+            '美': 'mod.lang_us',
+            '英': 'mod.lang_uk',
+            '俄': 'mod.lang_ru',
+            '德': 'mod.lang_de',
+            '日': 'mod.lang_jp',
+            '法': 'mod.lang_fr',
+            '未识别': 'mod.lang_unknown',
+            '其他': 'mod.lang_other',
+        };
+        return tr(keyMap[String(lang || '').trim()] || '', {}, lang);
+    }
+
+    function capabilityLabel(capKey, fallback) {
+        return tr(`mod.capability_${capKey}`, {}, fallback);
+    }
+
     function buildLangHtml(mod) {
         return normalizeLanguages(mod).map((lang) => {
             let cls = '';
             if (typeof window.UI_CONFIG !== 'undefined' && window.UI_CONFIG?.langMap?.[lang]) {
                 cls = window.UI_CONFIG.langMap[lang];
             }
-            return `<span class="lang-text ${cls}">${escapeHtml(lang)}</span>`;
+            return `<span class="lang-text ${cls}">${escapeHtml(localizeLanguageLabel(lang))}</span>`;
         }).join('<span class="mod-preview-lang-sep">/</span>');
     }
 
@@ -6036,7 +6265,7 @@ app.setupGlobalDragDrop = function () {
             Object.entries(UI_CONFIG.tagMap).forEach(([key, conf]) => {
                 if (!caps[key]) return;
                 tags.push({
-                    text: conf?.text || key,
+                    text: capabilityLabel(key, conf?.text || key),
                     cls: conf?.cls || '',
                 });
             });
@@ -6044,14 +6273,14 @@ app.setupGlobalDragDrop = function () {
         }
 
         const fallback = [
-            ['tank', 'tank', '陆战'],
-            ['air', 'air', '空战'],
-            ['naval', 'naval', '海战'],
-            ['radio', 'radio', '无线电/队友'],
-            ['missile', 'missile', '导弹音效'],
-            ['music', 'music', '音乐包'],
-            ['noise', 'noise', '降噪包'],
-            ['pilot', 'pilot', '飞行员语音'],
+            ['tank', 'tank', capabilityLabel('tank', '陆战')],
+            ['air', 'air', capabilityLabel('air', '空战')],
+            ['naval', 'naval', capabilityLabel('naval', '海战')],
+            ['radio', 'radio', capabilityLabel('radio', '无线电/队友')],
+            ['missile', 'missile', capabilityLabel('missile', '导弹音效')],
+            ['music', 'music', capabilityLabel('music', '音乐包')],
+            ['noise', 'noise', capabilityLabel('noise', '降噪包')],
+            ['pilot', 'pilot', capabilityLabel('pilot', '飞行员语音')],
         ];
         fallback.forEach(([capKey, cls, text]) => {
             if (caps[capKey]) tags.push({ text, cls });
@@ -6104,7 +6333,7 @@ app.setupGlobalDragDrop = function () {
     }
 
     function resolveDescription(mod) {
-        return String(mod?.full_desc || mod?.description || mod?.note || '暂无详细介绍').trim();
+        return String(mod?.full_desc || mod?.description || mod?.note || tr('mod.no_description', {}, '暂无详细介绍')).trim();
     }
 
     function splitVersionNoteText(raw) {
@@ -6144,7 +6373,7 @@ app.setupGlobalDragDrop = function () {
         if (raw) return splitVersionNoteText(raw);
 
         const version = `v${normalizeVersion(mod?.version)}`;
-        return [{ version, note: '暂无详细更新日志。' }];
+        return [{ version, note: tr('mod.no_version_notes', {}, '暂无详细更新日志。') }];
     }
 
     function normalizeRelatedVoicepacks(raw) {
@@ -6165,7 +6394,7 @@ app.setupGlobalDragDrop = function () {
         return raw
             .map((item, idx) => ({
                 preview_index: idx,
-                display_name: String(item?.display_name || `试听音频${idx + 1}`).trim() || `试听音频${idx + 1}`,
+                display_name: String(item?.display_name || tr('mod.default_audio_name', { index: idx + 1 }, `试听音频${idx + 1}`)).trim() || tr('mod.default_audio_name', { index: idx + 1 }, `试听音频${idx + 1}`),
                 source_name: String(item?.source_name || item?.source_file || '').trim(),
                 source_file: String(item?.source_file || '').trim(),
                 ext: String(item?.ext || '').trim().toLowerCase(),
@@ -6176,7 +6405,7 @@ app.setupGlobalDragDrop = function () {
     function buildVersionNoteHtml(mod) {
         const entries = resolveVersionNoteEntries(mod);
         if (!entries.length) {
-            return '<span class="mod-preview-empty">暂无详细更新日志。</span>';
+            return `<span class="mod-preview-empty">${escapeHtml(tr('mod.no_version_notes', {}, '暂无详细更新日志。'))}</span>`;
         }
         return entries.map((item) => {
             const versionText = String(item?.version || '').trim();
@@ -6185,7 +6414,7 @@ app.setupGlobalDragDrop = function () {
             const noteHtml = noteText ? `<div class="mod-preview-note-text">${escapeHtml(noteText)}</div>` : '';
             const content = (versionHtml || noteHtml)
                 ? `${versionHtml}${noteHtml}`
-                : `<div class="mod-preview-note-text">暂无详细更新日志。</div>`;
+                : `<div class="mod-preview-note-text">${escapeHtml(tr('mod.no_version_notes', {}, '暂无详细更新日志。'))}</div>`;
             return `<div class="mod-preview-note-item">${content}</div>`;
         }).join('');
     }
@@ -6208,7 +6437,7 @@ app.setupGlobalDragDrop = function () {
             <div class="modal-content mod-preview-modal-v2">
                 <div class="mod-preview-topbar">
                     <div class="mod-preview-head-main">
-                        <img class="mod-preview-author-avatar" id="mod-preview-author-avatar" src="${FALLBACK_AVATAR}" alt="author avatar">
+                            <img class="mod-preview-author-avatar" id="mod-preview-author-avatar" src="${FALLBACK_AVATAR}" alt="author avatar">
                         <div class="mod-preview-head-text">
                             <div class="mod-preview-title-wrap">
                                 <div class="mod-preview-title" id="mod-preview-title"></div>
@@ -6221,7 +6450,7 @@ app.setupGlobalDragDrop = function () {
                             </div>
                         </div>
                     </div>
-                    <button class="mod-preview-close-btn" type="button" title="关闭">
+                    <button class="mod-preview-close-btn" type="button" title="${escapeHtml(tr('common.close', {}, '关闭'))}">
                         <i class="ri-close-line"></i>
                     </button>
                 </div>
@@ -6229,19 +6458,19 @@ app.setupGlobalDragDrop = function () {
                 <div class="mod-preview-body">
                     <div class="mod-preview-left">
                         <div class="mod-preview-cover-box">
-                            <img class="mod-preview-cover" id="mod-preview-cover" src="" alt="语音包封面">
+                            <img class="mod-preview-cover" id="mod-preview-cover" src="" alt="${escapeHtml(tr('lib.voice_pack_label', {}, '语音包'))}">
                         </div>
                         <div class="mod-preview-attrs">
-                            <h4>文件属性</h4>
-                            <div class="row"><span><i class="ri-hard-drive-2-line"></i> 文件大小</span><b id="mod-preview-size"></b></div>
-                            <div class="row"><span><i class="ri-translate"></i> 语言支持</span><b id="mod-preview-lang"></b></div>
-                            <div class="row"><span><i class="ri-price-tag-3-line"></i> 标签数量</span><b id="mod-preview-tag-count"></b></div>
+                            <h4>${escapeHtml(tr('mod.file_attrs', {}, '文件属性'))}</h4>
+                            <div class="row"><span><i class="ri-hard-drive-2-line"></i> ${escapeHtml(tr('mod.file_size', {}, '文件大小'))}</span><b id="mod-preview-size"></b></div>
+                            <div class="row"><span><i class="ri-translate"></i> ${escapeHtml(tr('mod.language_support', {}, '语言支持'))}</span><b id="mod-preview-lang"></b></div>
+                            <div class="row"><span><i class="ri-price-tag-3-line"></i> ${escapeHtml(tr('mod.tag_count', {}, '标签数量'))}</span><b id="mod-preview-tag-count"></b></div>
                         </div>
                         <div class="mod-preview-compat">
                             <i class="ri-checkbox-circle-line"></i>
                             <div>
-                                <strong>兼容性良好</strong>
-                                <p>适配当前版本 War Thunder</p>
+                                <strong>${escapeHtml(tr('mod.compatibility_good', {}, '兼容性良好'))}</strong>
+                                <p>${escapeHtml(tr('mod.compatibility_desc', {}, '适配当前版本 War Thunder'))}</p>
                             </div>
                         </div>
                     </div>
@@ -6249,30 +6478,30 @@ app.setupGlobalDragDrop = function () {
                     <div class="mod-preview-right">
                         <div class="mod-preview-top-stack">
                             <section class="mod-preview-card mod-preview-tags-card">
-                                <h4><i class="ri-price-tag-3-line"></i> 包含内容</h4>
+                                <h4><i class="ri-price-tag-3-line"></i> ${escapeHtml(tr('mod.included_content', {}, '包含内容'))}</h4>
                                 <div class="mod-preview-tags-scroll" id="mod-preview-tags"></div>
                             </section>
 
                             <section class="mod-preview-card mod-preview-desc-card">
-                                <h4><i class="ri-information-line"></i> 详细介绍</h4>
+                                <h4><i class="ri-information-line"></i> ${escapeHtml(tr('mod.detail_intro', {}, '详细介绍'))}</h4>
                                 <div class="mod-preview-desc" id="mod-preview-desc"></div>
                             </section>
                         </div>
                         <div class="mod-preview-bottom-grid">
                             <section class="mod-preview-card">
-                                <h4><i class="ri-refresh-line"></i> 版本说明</h4>
+                                <h4><i class="ri-refresh-line"></i> ${escapeHtml(tr('mod.version_notes', {}, '版本说明'))}</h4>
                                 <div class="mod-preview-note-log" id="mod-preview-version-note"></div>
                             </section>
 
                             <section class="mod-preview-card mod-preview-links-card">
-                                <h4><i class="ri-links-line"></i> 关注与反馈</h4>
+                                <h4><i class="ri-links-line"></i> ${escapeHtml(tr('mod.follow_feedback', {}, '关注与反馈'))}</h4>
                                 <div class="mod-preview-link-grid">
-                                    <button class="mod-preview-link-btn bili" type="button" data-link-action="bili"><i class="ri-bilibili-line"></i> Bilibili 主页</button>
-                                    <button class="mod-preview-link-btn qq" type="button" data-link-action="qq"><i class="ri-qq-line"></i> 加入粉丝群</button>
+                                    <button class="mod-preview-link-btn bili" type="button" data-link-action="bili"><i class="ri-bilibili-line"></i> ${escapeHtml(tr('mod.bili_home', {}, 'Bilibili 主页'))}</button>
+                                    <button class="mod-preview-link-btn qq" type="button" data-link-action="qq"><i class="ri-qq-line"></i> ${escapeHtml(tr('mod.join_fan_group', {}, '加入粉丝群'))}</button>
                                     <button class="mod-preview-link-btn wt" type="button" data-link-action="wtlive"><i class="ri-global-line"></i> WT Live</button>
                                     <button class="mod-preview-link-btn liker" type="button" data-link-action="liker"><i class="ri-heart-3-line"></i> WT Liker</button>
-                                    <button class="mod-preview-link-btn other-works" type="button" data-link-action="otherworks"><i class="ri-apps-2-line"></i> 作者其他语音包</button>
-                                    <button class="mod-preview-link-btn feedback" type="button" data-link-action="feedback"><i class="ri-mail-send-line"></i> 联系作者反馈</button>
+                                    <button class="mod-preview-link-btn other-works" type="button" data-link-action="otherworks"><i class="ri-apps-2-line"></i> ${escapeHtml(tr('mod.author_other_packs', {}, '作者其他语音包'))}</button>
+                                    <button class="mod-preview-link-btn feedback" type="button" data-link-action="feedback"><i class="ri-mail-send-line"></i> ${escapeHtml(tr('mod.contact_author', {}, '联系作者反馈'))}</button>
                                 </div>
                             </section>
                         </div>
@@ -6281,10 +6510,10 @@ app.setupGlobalDragDrop = function () {
 
                 <div class="mod-preview-footer">
                     <div class="mod-preview-footer-actions">
-                        <button class="btn secondary" type="button" data-action="delete"><i class="ri-delete-bin-line"></i> 删除</button>
-                        <button class="btn secondary" type="button" data-action="open-folder"><i class="ri-folder-open-line"></i> 打开</button>
-                        <button class="btn secondary" type="button" data-action="audition"><i class="ri-play-circle-line"></i> 试听语音</button>
-                        <button class="btn primary" type="button" data-action="apply"><i class="ri-check-line"></i> 应用语音包</button>
+                        <button class="btn secondary" type="button" data-action="delete"><i class="ri-delete-bin-line"></i> ${escapeHtml(tr('mod.delete', {}, '删除'))}</button>
+                        <button class="btn secondary" type="button" data-action="open-folder"><i class="ri-folder-open-line"></i> ${escapeHtml(tr('mod.open', {}, '打开'))}</button>
+                        <button class="btn secondary" type="button" data-action="audition"><i class="ri-play-circle-line"></i> ${escapeHtml(tr('mod.audition', {}, '试听语音'))}</button>
+                        <button class="btn primary" type="button" data-action="apply"><i class="ri-check-line"></i> ${escapeHtml(tr('mod.apply', {}, '应用语音包'))}</button>
                     </div>
                 </div>
             </div>
@@ -6334,7 +6563,7 @@ app.setupGlobalDragDrop = function () {
             window.open(finalUrl, '_blank', 'noopener');
         } catch (e) {
             if (app && typeof app.showAlert === 'function') {
-                app.showAlert('错误', '打开链接失败', 'error');
+                app.showAlert(tr('common.error', {}, '错误'), tr('common.open_link_failed', {}, '打开链接失败'), 'error');
             }
         }
     }
@@ -6367,7 +6596,7 @@ app.setupGlobalDragDrop = function () {
                 const modId = String(mod?.id || '').trim();
                 if (!modId) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('提示', '语音包标识为空，无法打开目录', 'warn');
+                        app.showAlert(tr('common.info', {}, '提示'), tr('mod.id_empty_open_folder', {}, '语音包标识为空，无法打开目录'), 'warn');
                     }
                     return;
                 }
@@ -6376,7 +6605,7 @@ app.setupGlobalDragDrop = function () {
                         const res = await pywebview.api.open_mod_folder(modId);
                         if (!res?.success) {
                             if (app && typeof app.showAlert === 'function') {
-                                app.showAlert('错误', res?.msg || '打开目录失败', 'error');
+                                app.showAlert(tr('common.error', {}, '错误'), res?.msg || tr('common.open_directory_failed', {}, '打开目录失败'), 'error');
                             }
                         }
                         return;
@@ -6386,11 +6615,11 @@ app.setupGlobalDragDrop = function () {
                         return;
                     }
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', '打开目录接口不可用', 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), tr('common.open_directory_unavailable', {}, '打开目录接口不可用'), 'error');
                     }
                 } catch (e) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', `打开目录失败: ${e.message || e}`, 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), tr('common.operation_failed', { message: e.message || e }, `打开目录失败: ${e.message || e}`), 'error');
                     }
                 }
             };
@@ -6402,7 +6631,7 @@ app.setupGlobalDragDrop = function () {
                     const useRandomPreview = mod?.preview_use_random_bank !== false || !manualPreviewItems.length;
                     if (mod?.preview_use_random_bank === false && !manualPreviewItems.length) {
                         if (app && typeof app.showInfoToast === 'function') {
-                            app.showInfoToast('提示', '未配置作者试听文件，已回退到随机试听');
+                            app.showInfoToast(tr('common.info', {}, '提示'), tr('mod.audition_fallback_random', {}, '未配置作者试听文件，已回退到随机试听'));
                         }
                     }
                     if (!useRandomPreview) {
@@ -6412,14 +6641,14 @@ app.setupGlobalDragDrop = function () {
 
                     if (!window.pywebview?.api?.start_mod_audition_scan || !window.pywebview?.api?.get_mod_audition_categories_snapshot) {
                         if (app && typeof app.showAlert === 'function') {
-                            app.showAlert('错误', '后端试听接口不可用', 'error');
+                            app.showAlert(tr('common.error', {}, '错误'), tr('audition.backend_unavailable', {}, '后端试听接口不可用'), 'error');
                         }
                         return;
                     }
 
                     auditionBtn.disabled = true;
                     const oldHtml = auditionBtn.innerHTML;
-                    auditionBtn.innerHTML = '<i class="ri-loader-2-line"></i> 初始化试听...';
+                    auditionBtn.innerHTML = `<i class="ri-loader-2-line"></i> ${escapeHtml(tr('audition.preparing', {}, '初始化试听...'))}`;
                     const currentState = window.__auditionPickerState;
                     const currentModId = String(mod.id || '');
                     if (currentState && currentState.modId === currentModId) {
@@ -6427,7 +6656,7 @@ app.setupGlobalDragDrop = function () {
                         auditionBtn.innerHTML = oldHtml;
                         auditionBtn.disabled = false;
                         if (app && typeof app.showInfoToast === 'function') {
-                            app.showInfoToast('提示', '该语音包试听窗口已打开');
+                            app.showInfoToast(tr('common.info', {}, '提示'), tr('mod.audition_window_open', {}, '该语音包试听窗口已打开'));
                         }
                         return;
                     }
@@ -6441,9 +6670,9 @@ app.setupGlobalDragDrop = function () {
                     auditionBtn.disabled = false;
 
                     if (!snap || !snap.success) {
-                        const msg = (snap && snap.msg) ? snap.msg : '试听初始化失败';
+                        const msg = (snap && snap.msg) ? snap.msg : tr('mod.audition_init_failed', {}, '试听初始化失败');
                         if (app && typeof app.showAlert === 'function') {
-                            app.showAlert('错误', msg, 'error');
+                            app.showAlert(tr('common.error', {}, '错误'), msg, 'error');
                         }
                         return;
                     }
@@ -6453,10 +6682,10 @@ app.setupGlobalDragDrop = function () {
                 } catch (e) {
                     if (auditionBtn) {
                         auditionBtn.disabled = false;
-                        auditionBtn.innerHTML = '<i class="ri-play-circle-line"></i> 试听语音';
+                        auditionBtn.innerHTML = `<i class="ri-play-circle-line"></i> ${escapeHtml(tr('mod.audition', {}, '试听语音'))}`;
                     }
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', `试听失败: ${e.message || e}`, 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), tr('mod.audition_failed_with_message', { message: e.message || e }, `试听失败: ${e.message || e}`), 'error');
                     }
                 }
             };
@@ -6480,22 +6709,22 @@ app.setupGlobalDragDrop = function () {
 
         overlay.innerHTML = `
             <div class="modal-content" style="max-width:980px;width:min(94vw,980px);padding:20px;max-height:86vh;display:flex;flex-direction:column;">
-                <h3 style="margin:0 0 12px 0;">选择试听分类</h3>
+                <h3 style="margin:0 0 12px 0;">${escapeHtml(tr('audition.choose_category', {}, '选择试听分类'))}</h3>
                 <div style="display:flex;gap:8px;margin-bottom:10px;">
-                    <input id="audition-search" type="text" placeholder="搜索分类名 / code" style="flex:1;padding:10px;border:1px solid var(--border-color);border-radius:10px;">
-                    <span id="audition-count" style="align-self:center;color:var(--text-secondary);font-size:13px;line-height:1;padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;white-space:nowrap;">等待解析...</span>
+                    <input id="audition-search" type="text" placeholder="${escapeHtml(tr('audition.search_category_placeholder', {}, '搜索分类名 / code'))}" style="flex:1;padding:10px;border:1px solid var(--border-color);border-radius:10px;">
+                    <span id="audition-count" style="align-self:center;color:var(--text-secondary);font-size:13px;line-height:1;padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;white-space:nowrap;">${escapeHtml(tr('audition.waiting_parse', {}, '等待解析...'))}</span>
                 </div>
                 <div style="margin-bottom:10px;">
-                    <div id="audition-progress-text" style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">准备中...</div>
+                    <div id="audition-progress-text" style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">${escapeHtml(tr('audition.preparing', {}, '准备中...'))}</div>
                     <div style="height:8px;background:var(--bg-card-soft, rgba(127,127,127,0.2));border-radius:999px;overflow:hidden;border:1px solid var(--border-color);">
                         <div id="audition-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--primary),#ffb347);transition:width .2s ease;"></div>
                     </div>
                 </div>
                 <select id="audition-select" size="22" style="width:100%;flex:1;min-height:320px;font-family:Consolas, monospace;padding:10px;border:1px solid var(--border-color);border-radius:10px;"></select>
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px;">
-                    <button class="btn secondary" type="button" id="audition-pause-btn">暂停解析</button>
-                    <button class="btn secondary" type="button" id="audition-close-btn">关闭</button>
-                    <button class="btn primary" type="button" id="audition-play-btn"><i class="ri-play-circle-line"></i> 随机试听该分类</button>
+                    <button class="btn secondary" type="button" id="audition-pause-btn">${escapeHtml(tr('audition.pause_parse', {}, '暂停解析'))}</button>
+                    <button class="btn secondary" type="button" id="audition-close-btn">${escapeHtml(tr('common.close', {}, '关闭'))}</button>
+                    <button class="btn primary" type="button" id="audition-play-btn"><i class="ri-play-circle-line"></i> ${escapeHtml(tr('audition.random_play_category', {}, '随机试听该分类'))}</button>
                 </div>
             </div>
         `;
@@ -6509,7 +6738,7 @@ app.setupGlobalDragDrop = function () {
         const playBtn = overlay.querySelector('#audition-play-btn');
         const closeBtn = overlay.querySelector('#audition-close-btn');
         const pauseBtn = overlay.querySelector('#audition-pause-btn');
-        let snapshotStatusText = '准备中...';
+        let snapshotStatusText = tr('audition.preparing', {}, '准备中...');
 
         const close = (switching = false) => {
             if (window.__aimerAuditionAudio) {
@@ -6531,7 +6760,7 @@ app.setupGlobalDragDrop = function () {
                 window.__auditionPickerState = null;
             }
             if (!switching && app && typeof app.showInfoToast === 'function') {
-                app.showInfoToast('提示', '已关闭试听窗口');
+                app.showInfoToast(tr('common.info', {}, '提示'), tr('audition.closed', {}, '已关闭试听窗口'));
             }
         };
 
@@ -6544,14 +6773,14 @@ app.setupGlobalDragDrop = function () {
                 const hit = !q || name.toLowerCase().includes(q) || code.toLowerCase().includes(q);
                 if (!hit) return '';
                 visible += 1;
-                const label = `${escapeHtml(name)} (${Number(it.count || 0)} 条) [${escapeHtml(code)}]`;
+                const label = `${escapeHtml(name)} (${escapeHtml(tr('audition.item_count', { count: Number(it.count || 0) }, `${Number(it.count || 0)} 条`))}) [${escapeHtml(code)}]`;
                 return `<option value="${idx}">${label}</option>`;
             }).join('');
             selectEl.innerHTML = html;
             if (progressTextEl) {
-                const base = snapshotStatusText || '解析中...';
+                const base = snapshotStatusText || tr('audition.parse_in_progress', {}, '解析中...');
                 if (visible !== categoriesData.length) {
-                    progressTextEl.textContent = `${base} · 当前筛选 ${visible}/${categoriesData.length} 类`;
+                    progressTextEl.textContent = tr('audition.filtered_categories', { base, visible, total: categoriesData.length }, `${base} · 当前筛选 ${visible}/${categoriesData.length} 类`);
                 } else {
                     progressTextEl.textContent = base;
                 }
@@ -6564,9 +6793,9 @@ app.setupGlobalDragDrop = function () {
             if (countEl) {
                 const p = Number(snap.progress || 0);
                 const msg = String(snap.message || '');
-                countEl.textContent = `${categoriesData.length} 类 / ${Number(snap.count || 0)} 条`;
+                countEl.textContent = tr('audition.count_summary', { categories: categoriesData.length, items: Number(snap.count || 0) }, `${categoriesData.length} 类 / ${Number(snap.count || 0)} 条`);
                 if (progressTextEl) {
-                    snapshotStatusText = `${msg || '解析中'} (${p}%)`;
+                    snapshotStatusText = `${msg || tr('audition.parse_in_progress', {}, '解析中')} (${p}%)`;
                     progressTextEl.textContent = snapshotStatusText;
                 }
                 if (progressBarEl) {
@@ -6574,10 +6803,10 @@ app.setupGlobalDragDrop = function () {
                 }
                 if (snap.done) {
                     if (snap.error) {
-                        snapshotStatusText = `解析结束：${snap.error}`;
+                        snapshotStatusText = tr('audition.parse_finished_error', { message: snap.error }, `解析结束：${snap.error}`);
                         if (progressTextEl) progressTextEl.textContent = snapshotStatusText;
                     } else {
-                        snapshotStatusText = `解析完成：${categoriesData.length} 类，${Number(snap.count || 0)} 条语音`;
+                        snapshotStatusText = tr('audition.parse_completed', { categories: categoriesData.length, items: Number(snap.count || 0) }, `解析完成：${categoriesData.length} 类，${Number(snap.count || 0)} 条语音`);
                         if (progressTextEl) progressTextEl.textContent = snapshotStatusText;
                     }
                 }
@@ -6586,10 +6815,10 @@ app.setupGlobalDragDrop = function () {
             if (pauseBtn) {
                 if (snap.done) {
                     pauseBtn.disabled = true;
-                    pauseBtn.textContent = '解析已完成';
+                    pauseBtn.textContent = tr('audition.parse_done_button', {}, '解析已完成');
                 } else {
                     pauseBtn.disabled = false;
-                    pauseBtn.textContent = snap.paused ? '继续解析' : '暂停解析';
+                    pauseBtn.textContent = snap.paused ? tr('audition.resume_parse', {}, '继续解析') : tr('audition.pause_parse', {}, '暂停解析');
                 }
             }
         };
@@ -6604,13 +6833,13 @@ app.setupGlobalDragDrop = function () {
             try {
                 if (!selectEl || !selectEl.value) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('提示', '请先选择一个分类', 'warn');
+                        app.showAlert(tr('common.info', {}, '提示'), tr('audition.select_category_required', {}, '请先选择一个分类'), 'warn');
                     }
                     return;
                 }
                 if (!window.pywebview?.api?.audition_mod_random_by_type) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', '后端试听接口不可用', 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), tr('audition.backend_unavailable', {}, '后端试听接口不可用'), 'error');
                     }
                     return;
                 }
@@ -6622,20 +6851,20 @@ app.setupGlobalDragDrop = function () {
                 if (selectedCode === 'preview') {
                     if (!window.pywebview?.api?.list_mod_audition_items_by_type) {
                         if (app && typeof app.showAlert === 'function') {
-                            app.showAlert('错误', '后端手动试听接口不可用', 'error');
+                            app.showAlert(tr('common.error', {}, '错误'), tr('audition.backend_manual_unavailable', {}, '后端手动试听接口不可用'), 'error');
                         }
                         return;
                     }
                     playBtn.disabled = true;
                     const oldHtml = playBtn.innerHTML;
-                    playBtn.innerHTML = '<i class="ri-loader-2-line"></i> 加载试听条目...';
+                    playBtn.innerHTML = `<i class="ri-loader-2-line"></i> ${escapeHtml(tr('audition.loading_items', {}, '加载试听条目...'))}`;
                     const listRes = await pywebview.api.list_mod_audition_items_by_type(mod.id, selected.code);
                     playBtn.disabled = false;
                     playBtn.innerHTML = oldHtml;
                     if (!listRes || !listRes.success || !Array.isArray(listRes.items) || listRes.items.length === 0) {
-                        const msg = (listRes && listRes.msg) ? listRes.msg : '未获取到可试听条目';
+                        const msg = (listRes && listRes.msg) ? listRes.msg : tr('audition.no_items', {}, '未获取到可试听条目');
                         if (app && typeof app.showAlert === 'function') {
-                            app.showAlert('错误', msg, 'error');
+                            app.showAlert(tr('common.error', {}, '错误'), msg, 'error');
                         }
                         return;
                     }
@@ -6645,7 +6874,7 @@ app.setupGlobalDragDrop = function () {
 
                 playBtn.disabled = true;
                 const oldHtml = playBtn.innerHTML;
-                playBtn.innerHTML = '<i class="ri-loader-2-line"></i> 随机抽取中...';
+                playBtn.innerHTML = `<i class="ri-loader-2-line"></i> ${escapeHtml(tr('audition.random_picking', {}, '随机抽取中...'))}`;
                 const res = await pywebview.api.audition_mod_random_by_type(
                     mod.id,
                     selected.code,
@@ -6655,9 +6884,9 @@ app.setupGlobalDragDrop = function () {
                 playBtn.innerHTML = oldHtml;
 
                 if (!res || !res.success || !res.audio_url) {
-                    const msg = (res && res.msg) ? res.msg : '试听失败';
+                    const msg = (res && res.msg) ? res.msg : tr('mod.audition_failed', {}, '试听失败');
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', msg, 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), msg, 'error');
                     }
                     return;
                 }
@@ -6671,15 +6900,15 @@ app.setupGlobalDragDrop = function () {
                 player.src = res.audio_url;
                 await player.play();
                 if (app && typeof app.showInfoToast === 'function') {
-                    const picked = String(res.picked_name || '随机语音');
+                    const picked = String(res.picked_name || tr('audition.random_voice', {}, '随机语音'));
                     const typeName = String(res.voice_type_name || selected.name || selected.code);
-                    app.showInfoToast('试听中', `分类[${typeName}] 随机播放：${picked}`);
+                    app.showInfoToast(tr('audition.playing_title', {}, '试听中'), tr('audition.playing_random', { type: typeName, name: picked }, `分类[${typeName}] 随机播放：${picked}`));
                 }
             } catch (e) {
                 playBtn.disabled = false;
-                playBtn.innerHTML = '<i class="ri-play-circle-line"></i> 随机试听该分类';
+                playBtn.innerHTML = `<i class="ri-play-circle-line"></i> ${escapeHtml(tr('audition.random_play_category', {}, '随机试听该分类'))}`;
                 if (app && typeof app.showAlert === 'function') {
-                    app.showAlert('错误', `试听失败: ${e.message || e}`, 'error');
+                    app.showAlert(tr('common.error', {}, '错误'), tr('mod.audition_failed_with_message', { message: e.message || e }, `试听失败: ${e.message || e}`), 'error');
                 }
             }
         };
@@ -6693,26 +6922,26 @@ app.setupGlobalDragDrop = function () {
                 try {
                     if (!window.pywebview?.api?.set_mod_audition_scan_paused) {
                         if (app && typeof app.showAlert === 'function') {
-                            app.showAlert('错误', '后端暂停接口不可用', 'error');
+                            app.showAlert(tr('common.error', {}, '错误'), tr('audition.backend_pause_unavailable', {}, '后端暂停接口不可用'), 'error');
                         }
                         return;
                     }
-                    const willPause = pauseBtn.textContent.includes('暂停');
+                    const willPause = pauseBtn.textContent.includes(tr('audition.pause_parse', {}, '暂停解析')) || pauseBtn.textContent.includes('暂停');
                     pauseBtn.disabled = true;
                     const res = await pywebview.api.set_mod_audition_scan_paused(mod.id, willPause);
                     if (!res || !res.success) {
                         if (app && typeof app.showAlert === 'function') {
-                            app.showAlert('错误', (res && res.msg) ? res.msg : '操作失败', 'error');
+                            app.showAlert(tr('common.error', {}, '错误'), (res && res.msg) ? res.msg : tr('common.failure', {}, '操作失败'), 'error');
                         }
                         pauseBtn.disabled = false;
                         return;
                     }
-                    pauseBtn.textContent = res.paused ? '继续解析' : '暂停解析';
+                    pauseBtn.textContent = res.paused ? tr('audition.resume_parse', {}, '继续解析') : tr('audition.pause_parse', {}, '暂停解析');
                     pauseBtn.disabled = false;
                 } catch (e) {
                     pauseBtn.disabled = false;
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', `操作失败: ${e.message || e}`, 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), tr('common.operation_failed', { message: e.message || e }, `操作失败: ${e.message || e}`), 'error');
                     }
                 }
             });
@@ -6727,7 +6956,7 @@ app.setupGlobalDragDrop = function () {
             update: updateFromSnapshot,
             close,
         };
-        updateFromSnapshot({ categories: categoriesData, progress: 0, message: '等待解析', done: false, count: 0 });
+        updateFromSnapshot({ categories: categoriesData, progress: 0, message: tr('audition.waiting_parse_message', {}, '等待解析'), done: false, count: 0 });
     }
 
     function openManualPreviewPicker(mod, category, items) {
@@ -6745,15 +6974,15 @@ app.setupGlobalDragDrop = function () {
 
         overlay.innerHTML = `
             <div class="modal-content" style="max-width:980px;width:min(94vw,980px);padding:20px;max-height:86vh;display:flex;flex-direction:column;">
-                <h3 style="margin:0 0 12px 0;">手动选择试听语音 - ${escapeHtml(String(category?.name || '试听'))}</h3>
+                <h3 style="margin:0 0 12px 0;">${escapeHtml(tr('audition.manual_title', { name: String(category?.name || tr('audition.manual_fallback_title', {}, '试听')) }, `手动选择试听语音 - ${String(category?.name || '试听')}`))}</h3>
                 <div style="display:flex;gap:8px;margin-bottom:10px;">
-                    <input id="manual-preview-search" type="text" placeholder="搜索语音名 / bank 文件名" style="flex:1;padding:10px;border:1px solid var(--border-color);border-radius:10px;">
-                    <span id="manual-preview-count" style="align-self:center;color:var(--text-secondary);font-size:13px;line-height:1;padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;white-space:nowrap;">共 ${items.length} 条</span>
+                    <input id="manual-preview-search" type="text" placeholder="${escapeHtml(tr('audition.search_voice_placeholder', {}, '搜索语音名 / bank 文件名'))}" style="flex:1;padding:10px;border:1px solid var(--border-color);border-radius:10px;">
+                    <span id="manual-preview-count" style="align-self:center;color:var(--text-secondary);font-size:13px;line-height:1;padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;white-space:nowrap;">${escapeHtml(tr('audition.total_items', { count: items.length }, `共 ${items.length} 条`))}</span>
                 </div>
                 <select id="manual-preview-select" size="22" style="width:100%;flex:1;min-height:320px;font-family:Consolas, monospace;padding:10px;border:1px solid var(--border-color);border-radius:10px;">${optionsHtml}</select>
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px;">
-                    <button class="btn secondary" type="button" id="manual-preview-close-btn">关闭</button>
-                    <button class="btn primary" type="button" id="manual-preview-play-btn"><i class="ri-play-circle-line"></i> 播放选中语音</button>
+                    <button class="btn secondary" type="button" id="manual-preview-close-btn">${escapeHtml(tr('common.close', {}, '关闭'))}</button>
+                    <button class="btn primary" type="button" id="manual-preview-play-btn"><i class="ri-play-circle-line"></i> ${escapeHtml(tr('audition.play_selected_voice', {}, '播放选中语音'))}</button>
                 </div>
             </div>
         `;
@@ -6784,20 +7013,20 @@ app.setupGlobalDragDrop = function () {
                 const d = formatDuration(it.duration_sec);
                 return `<option value="${idx}">#${idx + 1} ${nm} (${d}) [${bk}]</option>`;
             }).join('');
-            if (countEl) countEl.textContent = `显示 ${filtered.length} / ${items.length} 条`;
+            if (countEl) countEl.textContent = tr('audition.display_count', { visible: filtered.length, total: items.length }, `显示 ${filtered.length} / ${items.length} 条`);
         };
 
         const playSelected = async () => {
             try {
                 if (!selectEl || !selectEl.value) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('提示', '请先选择一条语音', 'warn');
+                        app.showAlert(tr('common.info', {}, '提示'), tr('audition.select_voice_required', {}, '请先选择一条语音'), 'warn');
                     }
                     return;
                 }
                 if (!window.pywebview?.api?.audition_mod_stream) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', '后端播放接口不可用', 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), tr('audition.backend_play_unavailable', {}, '后端播放接口不可用'), 'error');
                     }
                     return;
                 }
@@ -6806,7 +7035,7 @@ app.setupGlobalDragDrop = function () {
 
                 playBtn.disabled = true;
                 const oldHtml = playBtn.innerHTML;
-                playBtn.innerHTML = '<i class="ri-loader-2-line"></i> 解析中...';
+                playBtn.innerHTML = `<i class="ri-loader-2-line"></i> ${escapeHtml(tr('audition.parsing', {}, '解析中...'))}`;
                 const res = await pywebview.api.audition_mod_stream(
                     mod.id,
                     selected.bank_rel,
@@ -6817,9 +7046,9 @@ app.setupGlobalDragDrop = function () {
                 playBtn.disabled = false;
                 playBtn.innerHTML = oldHtml;
                 if (!res || !res.success || !res.audio_url) {
-                    const msg = (res && res.msg) ? res.msg : '试听失败';
+                    const msg = (res && res.msg) ? res.msg : tr('mod.audition_failed', {}, '试听失败');
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', msg, 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), msg, 'error');
                     }
                     return;
                 }
@@ -6832,13 +7061,13 @@ app.setupGlobalDragDrop = function () {
                 player.src = res.audio_url;
                 await player.play();
                 if (app && typeof app.showInfoToast === 'function') {
-                    app.showInfoToast('试听中', `正在播放：${selected.name || ('#' + selected.stream_index)}`);
+                    app.showInfoToast(tr('audition.playing_title', {}, '试听中'), tr('audition.playing_voice', { name: selected.name || ('#' + selected.stream_index) }, `正在播放：${selected.name || ('#' + selected.stream_index)}`));
                 }
             } catch (e) {
                 playBtn.disabled = false;
-                playBtn.innerHTML = '<i class="ri-play-circle-line"></i> 播放选中语音';
+                playBtn.innerHTML = `<i class="ri-play-circle-line"></i> ${escapeHtml(tr('audition.play_selected_voice', {}, '播放选中语音'))}`;
                 if (app && typeof app.showAlert === 'function') {
-                    app.showAlert('错误', `试听失败: ${e.message || e}`, 'error');
+                    app.showAlert(tr('common.error', {}, '错误'), tr('mod.audition_failed_with_message', { message: e.message || e }, `试听失败: ${e.message || e}`), 'error');
                 }
             }
         };
@@ -6859,22 +7088,22 @@ app.setupGlobalDragDrop = function () {
         overlay.style.zIndex = '10003';
 
         const optionsHtml = items.map((it, idx) => {
-            const nm = escapeHtml(String(it.display_name || `试听音频${idx + 1}`));
+            const nm = escapeHtml(String(it.display_name || tr('mod.default_audio_name', { index: idx + 1 }, `试听音频${idx + 1}`)));
             const src = escapeHtml(String(it.source_name || it.source_file || 'unknown'));
             return `<option value="${idx}">#${idx + 1} ${nm} [${src}]</option>`;
         }).join('');
 
         overlay.innerHTML = `
             <div class="modal-content" style="max-width:980px;width:min(94vw,980px);padding:20px;max-height:86vh;display:flex;flex-direction:column;">
-                <h3 style="margin:0 0 12px 0;">作者提供的试听文件</h3>
+                <h3 style="margin:0 0 12px 0;">${escapeHtml(tr('audition.author_preview_title', {}, '作者提供的试听文件'))}</h3>
                 <div style="display:flex;gap:8px;margin-bottom:10px;">
-                    <input id="author-preview-search" type="text" placeholder="搜索试听名称 / 文件名" style="flex:1;padding:10px;border:1px solid var(--border-color);border-radius:10px;">
-                    <span id="author-preview-count" style="align-self:center;color:var(--text-secondary);font-size:13px;line-height:1;padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;white-space:nowrap;">共 ${items.length} 条</span>
+                    <input id="author-preview-search" type="text" placeholder="${escapeHtml(tr('audition.search_preview_placeholder', {}, '搜索试听名称 / 文件名'))}" style="flex:1;padding:10px;border:1px solid var(--border-color);border-radius:10px;">
+                    <span id="author-preview-count" style="align-self:center;color:var(--text-secondary);font-size:13px;line-height:1;padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;white-space:nowrap;">${escapeHtml(tr('audition.total_items', { count: items.length }, `共 ${items.length} 条`))}</span>
                 </div>
                 <select id="author-preview-select" size="18" style="width:100%;flex:1;min-height:280px;font-family:Consolas, monospace;padding:10px;border:1px solid var(--border-color);border-radius:10px;">${optionsHtml}</select>
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px;">
-                    <button class="btn secondary" type="button" id="author-preview-close-btn">关闭</button>
-                    <button class="btn primary" type="button" id="author-preview-play-btn"><i class="ri-play-circle-line"></i> 播放选中试听</button>
+                    <button class="btn secondary" type="button" id="author-preview-close-btn">${escapeHtml(tr('common.close', {}, '关闭'))}</button>
+                    <button class="btn primary" type="button" id="author-preview-play-btn"><i class="ri-play-circle-line"></i> ${escapeHtml(tr('audition.play_selected_preview', {}, '播放选中试听'))}</button>
                 </div>
             </div>
         `;
@@ -6900,24 +7129,24 @@ app.setupGlobalDragDrop = function () {
             });
             viewItems = filtered;
             selectEl.innerHTML = filtered.map((it, idx) => {
-                const nm = escapeHtml(String(it.display_name || `试听音频${idx + 1}`));
+                const nm = escapeHtml(String(it.display_name || tr('mod.default_audio_name', { index: idx + 1 }, `试听音频${idx + 1}`)));
                 const src = escapeHtml(String(it.source_name || it.source_file || 'unknown'));
                 return `<option value="${idx}">#${idx + 1} ${nm} [${src}]</option>`;
             }).join('');
-            if (countEl) countEl.textContent = `显示 ${filtered.length} / ${items.length} 条`;
+            if (countEl) countEl.textContent = tr('audition.display_count', { visible: filtered.length, total: items.length }, `显示 ${filtered.length} / ${items.length} 条`);
         };
 
         const playSelected = async () => {
             try {
                 if (!selectEl || !selectEl.value) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('提示', '请先选择一个试听文件', 'warn');
+                        app.showAlert(tr('common.info', {}, '提示'), tr('audition.select_preview_required', {}, '请先选择一个试听文件'), 'warn');
                     }
                     return;
                 }
                 if (!window.pywebview?.api?.audition_mod_preview_audio) {
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', '后端试听接口不可用', 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), tr('audition.backend_unavailable', {}, '后端试听接口不可用'), 'error');
                     }
                     return;
                 }
@@ -6926,7 +7155,7 @@ app.setupGlobalDragDrop = function () {
 
                 playBtn.disabled = true;
                 const oldHtml = playBtn.innerHTML;
-                playBtn.innerHTML = '<i class="ri-loader-2-line"></i> 加载试听...';
+                playBtn.innerHTML = `<i class="ri-loader-2-line"></i> ${escapeHtml(tr('audition.loading_preview', {}, '加载试听...'))}`;
                 const res = await pywebview.api.audition_mod_preview_audio(
                     mod.id,
                     selected.preview_index
@@ -6934,9 +7163,9 @@ app.setupGlobalDragDrop = function () {
                 playBtn.disabled = false;
                 playBtn.innerHTML = oldHtml;
                 if (!res || !res.success || !res.audio_url) {
-                    const msg = (res && res.msg) ? res.msg : '试听失败';
+                    const msg = (res && res.msg) ? res.msg : tr('mod.audition_failed', {}, '试听失败');
                     if (app && typeof app.showAlert === 'function') {
-                        app.showAlert('错误', msg, 'error');
+                        app.showAlert(tr('common.error', {}, '错误'), msg, 'error');
                     }
                     return;
                 }
@@ -6950,13 +7179,13 @@ app.setupGlobalDragDrop = function () {
                 player.src = res.audio_url;
                 await player.play();
                 if (app && typeof app.showInfoToast === 'function') {
-                    app.showInfoToast('试听中', `正在播放：${res.preview_name || selected.display_name}`);
+                    app.showInfoToast(tr('audition.playing_title', {}, '试听中'), tr('audition.playing_voice', { name: res.preview_name || selected.display_name }, `正在播放：${res.preview_name || selected.display_name}`));
                 }
             } catch (e) {
                 playBtn.disabled = false;
-                playBtn.innerHTML = '<i class="ri-play-circle-line"></i> 播放选中试听';
+                playBtn.innerHTML = `<i class="ri-play-circle-line"></i> ${escapeHtml(tr('audition.play_selected_preview', {}, '播放选中试听'))}`;
                 if (app && typeof app.showAlert === 'function') {
-                    app.showAlert('错误', `试听失败: ${e.message || e}`, 'error');
+                    app.showAlert(tr('common.error', {}, '错误'), tr('mod.audition_failed_with_message', { message: e.message || e }, `试听失败: ${e.message || e}`), 'error');
                 }
             }
         };
@@ -6994,11 +7223,11 @@ app.setupGlobalDragDrop = function () {
                     <div class="author-works-title-wrap">
                         <span class="author-works-icon"><i class="ri-user-3-line"></i></span>
                         <div>
-                            <h3 id="author-works-title">作者其他语音包</h3>
-                            <p id="author-works-subtitle">发现更多高质量语音包</p>
+                            <h3 id="author-works-title">${escapeHtml(tr('mod.author_other_packs', {}, '作者其他语音包'))}</h3>
+                            <p id="author-works-subtitle">${escapeHtml(tr('mod.author_works_subtitle', {}, '发现更多高质量语音包'))}</p>
                         </div>
                     </div>
-                    <button class="mod-preview-close-btn" type="button" id="btn-author-works-close" title="关闭"><i class="ri-close-line"></i></button>
+                    <button class="mod-preview-close-btn" type="button" id="btn-author-works-close" title="${escapeHtml(tr('common.close', {}, '关闭'))}"><i class="ri-close-line"></i></button>
                 </div>
                 <div class="author-works-body">
                     <div class="author-works-grid" id="author-works-grid"></div>
@@ -7019,11 +7248,11 @@ app.setupGlobalDragDrop = function () {
         const currentVersion = normalizeVersion(mod?.version || '1.0');
         const currentDate = String(mod?.date || '').trim() || new Date().toISOString().split('T')[0];
         const currentSize = String(mod?.size_str || '<1 MB').trim() || '<1 MB';
-        const currentAuthor = String(mod?.author || '未知作者').trim() || '未知作者';
+        const currentAuthor = String(mod?.author || tr('mod.unknown_author', {}, '未知作者')).trim() || tr('mod.unknown_author', {}, '未知作者');
         const related = normalizeRelatedVoicepacks(mod?.related_voicepacks || []);
         return related.map((item, idx) => {
-            const title = item.name || `关联语音包${idx + 1}`;
-            const description = item.description || '作者推荐语音包';
+            const title = item.name || tr('mod.related_pack', { index: idx + 1 }, `关联语音包${idx + 1}`);
+            const description = item.description || tr('mod.author_recommended_pack', {}, '作者推荐语音包');
             const link = item.link;
             const coverUrl = item.avatar_url || 'assets/card_image.png';
             return {
@@ -7042,7 +7271,7 @@ app.setupGlobalDragDrop = function () {
                     language: [],
                     note: description,
                     full_desc: description,
-                    version_note: [{ version: currentVersion, note: '来自关联语音包配置。' }],
+                    version_note: [{ version: currentVersion, note: tr('mod.related_note', {}, '来自关联语音包配置。') }],
                     cover_url: coverUrl,
                     link_bilibili: link,
                     link_wtlive: '',
@@ -7062,13 +7291,13 @@ app.setupGlobalDragDrop = function () {
         if (!grid) return;
 
         if (!Array.isArray(items) || items.length === 0) {
-            grid.innerHTML = '<div class="author-works-empty">暂无可展示的语音包</div>';
+            grid.innerHTML = `<div class="author-works-empty">${escapeHtml(tr('mod.no_author_works', {}, '暂无可展示的语音包'))}</div>`;
             return;
         }
 
         grid.innerHTML = items.map((item, idx) => {
-            const title = escapeHtml(String(item?.title || '未命名语音包').trim() || '未命名语音包');
-            const desc = escapeHtml(String(item?.description || '暂无描述').trim() || '暂无描述');
+            const title = escapeHtml(String(item?.title || tr('mod.untitled_voice_pack', {}, '未命名语音包')).trim() || tr('mod.untitled_voice_pack', {}, '未命名语音包'));
+            const desc = escapeHtml(String(item?.description || tr('mod.no_description', {}, '暂无描述')).trim() || tr('mod.no_description', {}, '暂无描述'));
             const cover = escapeHtml(String(item?.cover_url || 'assets/card_image.png').trim() || 'assets/card_image.png');
             const canDetail = Boolean(item?.detail_mod || String(item?.link || '').trim());
             return `
@@ -7080,7 +7309,7 @@ app.setupGlobalDragDrop = function () {
                         <p>${desc}</p>
                         <div class="author-work-actions">
                             <button class="author-work-btn light ${canDetail ? '' : 'disabled'}" type="button" data-work-action="detail">
-                                详情 <i class="ri-external-link-line"></i>
+                                ${escapeHtml(tr('mod.detail', {}, '详情'))} <i class="ri-external-link-line"></i>
                             </button>
                         </div>
                     </div>
@@ -7111,11 +7340,11 @@ app.setupGlobalDragDrop = function () {
     function openAuthorWorksModal(mod, prebuiltItems = null) {
         const app = getApp();
         const overlay = ensureAuthorWorksModal();
-        const author = String(mod?.author || '作者').trim() || '作者';
+        const author = String(mod?.author || tr('mod.author_fallback', {}, '作者')).trim() || tr('mod.author_fallback', {}, '作者');
         const items = Array.isArray(prebuiltItems) ? prebuiltItems : collectAuthorWorks(mod);
         if (!items.length) {
             if (app && typeof app.showInfoToast === 'function') {
-                app.showInfoToast('提示', '作者未配置可关联语音包');
+                app.showInfoToast(tr('common.info', {}, '提示'), tr('mod.author_no_related', {}, '作者未配置可关联语音包'));
             }
             return;
         }
@@ -7126,7 +7355,7 @@ app.setupGlobalDragDrop = function () {
             iconEl.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.src='${escapeHtml(FALLBACK_AVATAR)}'">`;
         }
         const titleEl = overlay.querySelector('#author-works-title');
-        if (titleEl) titleEl.textContent = `${author} 的其他作品`;
+        if (titleEl) titleEl.textContent = tr('mod.author_other_title', { author }, `${author} 的其他作品`);
 
         renderAuthorWorksGrid(overlay, items);
         overlay.classList.remove('hiding');
@@ -7162,7 +7391,7 @@ app.setupGlobalDragDrop = function () {
                 const enabled = works.length > 0;
                 btn.classList.toggle('disabled', !enabled);
                 btn.disabled = !enabled;
-                btn.innerHTML = `<i class="ri-music-2-line"></i> 查看作者其他语音包 (${works.length})`;
+                btn.innerHTML = `<i class="ri-music-2-line"></i> ${escapeHtml(tr('mod.other_packs_button', { count: works.length }, `查看作者其他语音包 (${works.length})`))}`;
                 btn.onclick = () => {
                     if (!enabled) return;
                     openAuthorWorksModal(mod, works);
@@ -7213,11 +7442,11 @@ app.setupGlobalDragDrop = function () {
 
     function openPreview(mod) {
         const overlay = ensureModal();
-        const title = String(mod?.title || '未命名语音包');
-        const author = String(mod?.author || '未知作者');
-        const date = String(mod?.date || '未知日期');
+        const title = String(mod?.title || tr('mod.untitled_voice_pack', {}, '未命名语音包'));
+        const author = String(mod?.author || tr('mod.unknown_author', {}, '未知作者'));
+        const date = String(mod?.date || tr('mod.unknown_date', {}, '未知日期'));
         const authorAvatar = String(mod?.author_avatar || FALLBACK_AVATAR).trim() || FALLBACK_AVATAR;
-        const sizeText = String(mod?.size_str || '未知大小');
+        const sizeText = String(mod?.size_str || tr('mod.unknown_size', {}, '未知大小'));
         const cover = String(mod?.cover_url || 'assets/card_image.png');
         const version = normalizeVersion(mod?.version);
         const desc = resolveDescription(mod);
@@ -7253,8 +7482,8 @@ app.setupGlobalDragDrop = function () {
         }
         if (sizeEl) sizeEl.textContent = sizeText;
         if (langEl) langEl.innerHTML = buildLangHtml(mod);
-        if (tagCountEl) tagCountEl.textContent = `${tagCount} 个`;
-        if (tagsEl) tagsEl.innerHTML = tagHtml || '<span class="mod-preview-empty">暂无标签</span>';
+        if (tagCountEl) tagCountEl.textContent = tr('mod.tag_count_unit', { count: tagCount }, `${tagCount} 个`);
+        if (tagsEl) tagsEl.innerHTML = tagHtml || `<span class="mod-preview-empty">${escapeHtml(tr('mod.no_tags', {}, '暂无标签'))}</span>`;
         if (descEl) descEl.textContent = desc;
         if (versionNoteEl) versionNoteEl.innerHTML = versionNoteHtml;
 

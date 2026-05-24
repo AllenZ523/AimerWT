@@ -257,6 +257,10 @@ const MinimalistLoading = {
         }
     },
 
+    showKey(autoSimulate = true, key = "loading.prepare", params = {}) {
+        this.show(autoSimulate, this._t(key, params || {}));
+    },
+
     // 手动更新进度 (Backend 调用) - 支持平滑线性过渡
     update(progress, message) {
         if (!this.overlay || this.overlay.classList.contains('hidden')) {
@@ -286,6 +290,10 @@ const MinimalistLoading = {
         if (!this.animationFrame) {
             this._animateProgress();
         }
+    },
+
+    updateKey(progress, key, params = {}) {
+        this.update(progress, this._t(key, params || {}));
     },
 
     // 平滑过渡动画

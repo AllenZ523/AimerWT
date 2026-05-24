@@ -492,6 +492,222 @@ class AppApi:
             self._logger.warning(f"AimerWT-Log 初始化失败: {e}")
         return path
 
+    def _safe_i18n_params(self, params=None):
+        safe = {}
+        if not isinstance(params, dict):
+            return safe
+        for key, value in params.items():
+            name = str(key)
+            if value is None or isinstance(value, (str, int, float, bool)):
+                safe[name] = "" if value is None else value
+            else:
+                safe[name] = str(value)
+        return safe
+
+    def _i18n_payload(self, key, params=None):
+        return {"key": str(key), "params": self._safe_i18n_params(params or {})}
+
+    def _coerce_i18n_payload(self, value):
+        if isinstance(value, dict):
+            key = value.get("key") or value.get("i18n_key")
+            if not key:
+                return None
+            params = value.get("params")
+            if params is None:
+                params = value.get("i18n_params")
+            return self._i18n_payload(key, params or {})
+        return None
+
+    def _match_i18n_patterns(self, text, patterns):
+        for pattern, key in patterns:
+            match = re.match(pattern, text)
+            if not match:
+                continue
+            params = match.groupdict()
+            for name, value in list(params.items()):
+                if isinstance(value, str) and value.isdigit():
+                    params[name] = int(value)
+            return self._i18n_payload(key, params)
+        return None
+
+    def _runtime_loading_i18n_payload(self, message):
+        payload = self._coerce_i18n_payload(message)
+        if payload:
+            return payload
+
+        text = str(message or "").strip()
+        if not text:
+            return None
+
+        static_map = {
+            "正在准备导入...": "loading.import.prepare",
+            "开始扫描待解压区...": "loading.import.scan_pending",
+            "导入完成": "loading.import.done",
+            "导入失败": "loading.import.failed",
+            "跳过重复文件": "loading.import.skip_duplicate",
+            "没有文件": "loading.common.no_files",
+            "全部完成": "loading.common.all_done",
+            "解压完成": "loading.archive.extract_done",
+            "完成整理": "loading.archive.organize_done",
+            "扫描待安装文件...": "loading.install.scan_files",
+            "未选择文件": "loading.install.no_selection",
+            "安装失败：无文件成功复制": "loading.install.failed_no_copied",
+            "更新游戏配置...": "loading.install.update_config",
+            "安装完成": "loading.install.done",
+            "安装失败": "loading.install.failed",
+            "涂装导入完成": "loading.skin.import_done",
+            "涂装导入失败": "loading.skin.import_failed",
+            "炮镜安装完成": "loading.sight.install_done",
+            "炮镜压缩包已导入": "loading.sight.archive_import_done",
+            "炮镜导入完成": "loading.sight.import_done",
+            "炮镜导入失败": "loading.sight.import_failed",
+            "正在解析语音包...": "loading.audition.parsing_pack",
+        }
+        key = static_map.get(text)
+        if key:
+            return self._i18n_payload(key)
+
+        patterns = [
+            (r"^准备导入: (?P<name>.+)$", "loading.import.prepare_named"),
+            (r"^正在读取: (?P<name>.+)$", "loading.import.reading"),
+            (r"^开始解压: (?P<name>.+)$", "loading.archive.start_extract"),
+            (r"^解压完成: (?P<name>.+)$", "loading.archive.extract_done_named"),
+            (r"^解压中: (?P<name>.+)$", "loading.archive.extracting_file"),
+            (r"^跳过: (?P<name>.+)$", "loading.import.skip_named"),
+            (r"^涂装解压: (?P<name>.+)$", "loading.skin.extracting_named"),
+            (r"^准备解压到 UserSkins: (?P<name>.+)$", "loading.skin.prepare_extract_to_userskins"),
+            (r"^炮镜安装: (?P<name>.+)$", "loading.sight.installing_named"),
+            (r"^炮镜解压: (?P<name>.+)$", "loading.sight.extracting_named"),
+            (r"^准备安装炮镜: (?P<name>.+)$", "loading.sight.prepare_install"),
+            (r"^已安装炮镜文件: (?P<name>.+)$", "loading.sight.file_installed"),
+            (r"^准备解压到 UserSights: (?P<name>.+)$", "loading.sight.prepare_extract_to_usersights"),
+            (r"^准备安装: (?P<name>.+)$", "loading.install.prepare_named"),
+            (r"^共 (?P<count>\d+) 个文件待安装$", "loading.install.file_count"),
+            (r"^(?:复制|複製): (?P<name>.+)$", "loading.install.copying_file"),
+            (r"^安装完成，但有 (?P<count>\d+) 个文件复制失败$", "loading.install.done_with_failed_files"),
+            (r"^安装失败：(?P<count>\d+) 个文件复制失败$", "loading.install.failed_file_count"),
+            (r"^安装失败：(?P<reason>.+)$", "loading.install.failed_with_reason"),
+            (r"^正在扫描 (?P<name>.+) \((?P<current>\d+)/(?P<total>\d+)\)$", "loading.audition.scanning_file"),
+            (r"^解析完成，共 (?P<count>\d+) 个分类$", "loading.audition.category_done"),
+            (r"^解析完成，共 (?P<count>\d+) 条语音$", "loading.audition.voice_done"),
+        ]
+        return self._match_i18n_patterns(text, patterns)
+
+    def _runtime_log_i18n_payload(self, message, record=None):
+        extra_payload = None
+        if record is not None:
+            extra_payload = self._coerce_i18n_payload({
+                "key": getattr(record, "i18n_key", None),
+                "params": getattr(record, "i18n_params", None),
+            })
+        if extra_payload:
+            return extra_payload
+
+        text = str(message or "").strip()
+        if not text:
+            return None
+
+        static_map = {
+            "[ERROR] 无法启动游戏：路径无效": "log.game.path_invalid",
+            "[INFO] 正在通过 Steam 启动 War Thunder ...": "log.game.launch_steam",
+            "[ERROR] 未找到游戏可执行文件 (launcher.exe / aces.exe)": "log.game.executable_not_found",
+            "[SYS] 遥测服务已启用": "log.settings.telemetry_enabled",
+            "[SYS] 遥测服务已停用": "log.settings.telemetry_disabled",
+            "[SYS] 设置开机自启动失败": "log.settings.autostart_failed",
+            "[SYS] 窗口已最小化到托盘": "log.window.minimized_to_tray",
+            "[SYS] 用户请求退出程序": "log.window.exit_requested",
+            "[WARN] 已拦截格式异常的外部链接": "log.link.malformed",
+            "[WARN] 已拦截格式异常的邮件链接": "log.link.mail_malformed",
+            "[SUCCESS] 自动搜索成功，路径已保存。": "log.search.success",
+            "深度扫描未发现游戏客户端。": "log.search.not_found",
+            "另一个任务正在进行中，请稍候...": "log.common.busy",
+            "已取消输入密码，导入已终止": "log.import.password_cancelled",
+            "游戏路径无效或未设置": "log.path.game_invalid_or_unset",
+            "未设置有效游戏路径，无法打开 UserSkins": "log.path.userskins_unset",
+            "未设置有效游戏路径，无法打开 UserMissions": "log.path.usermissions_unset",
+            "请先设置有效的 UserSights 路径": "log.sight.usersights_unset",
+            "[INIT] 创建 mod 文件夹...": "log.install.create_mod_folder",
+            "[MERGE] 检测到 mod 文件夹，准备覆盖安装...": "log.install.merge_existing",
+            "[COPY] 正在複製选中文件夹的内容...": "log.install.copy_selected",
+            "未选择任何文件夹，跳过安装。": "log.install.no_selection",
+            "未找到任何可安装的文件。": "log.install.no_files",
+            "所有文件复制均失败，安装未生效": "log.install.no_file_copied",
+            "已更新安装清单记录": "log.install.manifest_updated",
+            "安装失败：未设置有效游戏路径": "log.install.failed_game_path",
+        }
+        state_map = {
+            "[SYS] 开机自启动已开启": "log.settings.autostart_enabled",
+            "[SYS] 开机自启动已关闭": "log.settings.autostart_disabled",
+            "[SYS] 托盘模式已开启": "log.settings.tray_enabled",
+            "[SYS] 托盘模式已关闭": "log.settings.tray_disabled",
+            "[SYS] 关闭确认提示已开启": "log.settings.close_confirm_enabled",
+            "[SYS] 关闭确认提示已关闭": "log.settings.close_confirm_disabled",
+        }
+        key = state_map.get(text) or static_map.get(text)
+        if key:
+            return self._i18n_payload(key)
+
+        patterns = [
+            (r"^\[INIT] 已加载配置路径: (?P<path>.+)$", "log.path.loaded"),
+            (r"^配置路径失效: (?P<path>.+)$", "log.path.invalid"),
+            (r"^炮镜路径失效: (?P<message>.+)$", "log.sight.path_invalid"),
+            (r"^\[SUCCESS] 手动加载路径: (?P<path>.+)$", "log.path.manual_loaded"),
+            (r"^路径无效: (?P<message>.+)$", "log.path.invalid_reason"),
+            (r"^\[WARN] Steam 启动失败: (?P<message>.+)，尝试使用启动器\.\.\.$", "log.game.steam_failed_fallback"),
+            (r"^\[INFO] 正在启动游戏: (?P<name>.+) \.\.\.$", "log.game.launch_executable"),
+            (r"^\[ERROR] 启动失败: (?P<message>.+)$", "log.game.launch_failed"),
+            (r"^\[ERROR] start_game 发生未处理异常: (?P<message>.+)$", "log.game.unhandled_error"),
+            (r"^\[SYS] 最小化到托盘失败: (?P<message>.+)$", "log.window.minimize_to_tray_failed"),
+            (r"^\[WARN] 已拦截不支持的外部链接协议: (?P<scheme>.+)$", "log.link.unsupported_protocol"),
+            (r"^\[ERROR] 外部链接校验失败: (?P<message>.+)$", "log.link.validation_failed"),
+            (r"^\[ERROR] 无法打开链接: (?P<message>.+)$", "log.link.open_failed"),
+            (r"^\[INSTALL] 准备安装: (?P<name>.+)$", "log.install.prepare"),
+            (r"^已成功安装 (?P<total>\d+) 个文件，失败 (?P<failed>\d+) 个$", "log.install.summary"),
+            (r"^\[SUCCESS] \[DONE] 安装完成！本次覆盖/新增 (?P<total>\d+) 个文件。$", "log.install.done_summary"),
+            (r"^安装过程错误: (?P<message>.+)$", "log.install.process_error"),
+            (r"^安装过程严重错误: (?P<kind>[^:]+): (?P<message>.+)$", "log.install.process_critical"),
+            (r"^安装失败: (?P<message>.+)$", "log.install.failed_with_reason"),
+            (r"^未设置有效游戏路径: (?P<message>.+)$", "log.path.game_invalid_with_reason"),
+            (r"^导入失败: (?P<message>.+)$", "log.import.failed"),
+            (r"^涂装导入成功: (?P<path>.+)$", "log.skin.import_success"),
+            (r"^涂装导入失败: (?P<message>.+)$", "log.skin.import_failed"),
+            (r"^炮镜导入成功: (?P<path>.+)$", "log.sight.import_success"),
+            (r"^炮镜导入失败: (?P<message>.+)$", "log.sight.import_failed"),
+        ]
+        return self._match_i18n_patterns(text, patterns)
+
+    def _log_prefix(self, formatted_message, raw_message):
+        raw = str(raw_message or "")
+        formatted = str(formatted_message or "")
+        if raw and formatted.endswith(raw):
+            return formatted[:-len(raw)]
+        return ""
+
+    def _call_app_method(self, func_name, *args):
+        if not self._window:
+            return False
+        js_args = ", ".join(json.dumps(arg, ensure_ascii=True) for arg in args)
+        self._window.evaluate_js(
+            f"if(window.app && app.{func_name}) app.{func_name}({js_args})"
+        )
+        return True
+
+    def _call_loading_method(self, func_name, *args):
+        if not self._window:
+            return False
+        js_args = ", ".join(json.dumps(arg, ensure_ascii=True) for arg in args)
+        self._window.evaluate_js(
+            f"if(window.MinimalistLoading && MinimalistLoading.{func_name}) MinimalistLoading.{func_name}({js_args})"
+        )
+        return True
+
+    def _show_loading_i18n(self, key, params=None, auto_simulate=False):
+        return self._call_loading_method("showKey", bool(auto_simulate), str(key), self._safe_i18n_params(params or {}))
+
+    def _update_loading_i18n(self, progress, key, params=None):
+        safe_progress = max(0, min(100, int(progress)))
+        return self._call_loading_method("updateKey", safe_progress, str(key), self._safe_i18n_params(params or {}))
+
     def _resolve_telemetry_target_url(self):
         """解析当前应连接的遥测地址，并同步开发模式状态。"""
         dev_mode_file = Path(__file__).parent / ".dev_mode"
@@ -1086,11 +1302,36 @@ class AppApi:
         if not self._window:
             return
 
+        msg_content = ""
+        custom_tag = None
+        append_payload = None
+        log_level = getattr(record, "levelname", "INFO")
+
+        try:
+            msg_content = record.getMessage()
+            match = re.search(r"^\s*\[(SUCCESS|WARN|ERROR|INFO|SYS)]", msg_content)
+            custom_tag = match.group(1) if match else None
+            append_payload = self._runtime_log_i18n_payload(msg_content, record)
+            if custom_tag:
+                log_level = custom_tag
+        except Exception:
+            append_payload = None
+
         # 1. 追加日志到面板
         try:
-            safe_msg = formatted_message.replace("\r", "").replace("\n", "<br>")
-            msg_js = json.dumps(safe_msg, ensure_ascii=True)
-            self._window.evaluate_js(f"if(window.app && app.appendLog) app.appendLog({msg_js})")
+            if append_payload:
+                prefix = self._log_prefix(formatted_message, msg_content)
+                self._call_app_method(
+                    "appendI18nLog",
+                    log_level,
+                    append_payload["key"],
+                    append_payload["params"],
+                    prefix,
+                )
+            else:
+                safe_msg = formatted_message.replace("\r", "").replace("\n", "<br>")
+                msg_js = json.dumps(safe_msg, ensure_ascii=True)
+                self._window.evaluate_js(f"if(window.app && app.appendLog) app.appendLog({msg_js})")
         except Exception:
             # 避免在日志回调中抛异常导致业务中断
             log.exception("日志推送失败")
@@ -1099,13 +1340,9 @@ class AppApi:
 
         try:
             level_key = record.levelname  # INFO, WARNING, ERROR, DEBUG
-            msg_content = record.getMessage()
 
             # 兼容：从消息内容解析 [SUCCESS] / [WARN] / [ERROR] 等标签
             # 如果消息里显式写了 [SUCCESS]，我们认为它是 SUCCESS 级别
-            import re
-            match = re.search(r"^\s*\[(SUCCESS|WARN|ERROR|INFO|SYS)]", msg_content)
-            custom_tag = match.group(1) if match else None
 
             # 映射到前端 Toast 类型
             toast_level = None
@@ -1123,15 +1360,23 @@ class AppApi:
 
             # 如果有对应的 Toast 级别，则推送
             if toast_level:
-                # 去除换行
-                msg_plain = msg_content.replace("\r", " ").replace("\n", " ")
-                # 去除可能的标签前缀 (可选，保留也无妨，前端只是显示文本)
-                # msg_plain = re.sub(r"^\s*\[(SUCCESS|WARN|ERROR|INFO|SYS)\]\s*", "", msg_plain)
+                if append_payload:
+                    self._call_app_method(
+                        "notifyToastI18n",
+                        toast_level,
+                        append_payload["key"],
+                        append_payload["params"],
+                    )
+                else:
+                    # 去除换行
+                    msg_plain = msg_content.replace("\r", " ").replace("\n", " ")
+                    # 去除可能的标签前缀 (可选，保留也无妨，前端只是显示文本)
+                    # msg_plain = re.sub(r"^\s*\[(SUCCESS|WARN|ERROR|INFO|SYS)\]\s*", "", msg_plain)
 
-                msg_plain_js = json.dumps(msg_plain, ensure_ascii=True)
-                level_js = json.dumps(toast_level, ensure_ascii=True)
-                self._window.evaluate_js(
-                    f"if(window.app && app.notifyToast) app.notifyToast({level_js}, {msg_plain_js})")
+                    msg_plain_js = json.dumps(msg_plain, ensure_ascii=True)
+                    level_js = json.dumps(toast_level, ensure_ascii=True)
+                    self._window.evaluate_js(
+                        f"if(window.app && app.notifyToast) app.notifyToast({level_js}, {msg_plain_js})")
 
         except Exception:
             pass
@@ -1314,7 +1559,7 @@ class AppApi:
             game_path = self._cfg_mgr.get_game_path()
             if not game_path or not os.path.exists(game_path):
                 self._logger.error("[ERROR] 无法启动游戏：路径无效")
-                return {"success": False, "message": "游戏路径无效，请先重新选择路径。"}
+                return {"success": False, "message_key": "home.start_game_path_invalid"}
 
             mode = self._cfg_mgr.get_launch_mode()
             game_root = Path(game_path)
@@ -1358,13 +1603,21 @@ class AppApi:
                     return {"success": True}
                 except Exception as e:
                     self._logger.error(f"[ERROR] 启动失败: {e}", exc_info=True)
-                    return {"success": False, "message": f"启动失败：{e}"}
+                    return {
+                        "success": False,
+                        "message_key": "home.start_game_failed_with_message",
+                        "message_params": {"message": str(e)},
+                    }
 
             self._logger.error("[ERROR] 未找到游戏可执行文件 (launcher.exe / aces.exe)")
-            return {"success": False, "message": "未找到游戏可执行文件（launcher.exe / aces.exe）。"}
+            return {"success": False, "message_key": "home.start_game_executable_not_found"}
         except Exception as e:
             self._logger.error(f"[ERROR] start_game 发生未处理异常: {e}", exc_info=True)
-            return {"success": False, "message": f"启动游戏时发生异常：{e}"}
+            return {
+                "success": False,
+                "message_key": "home.start_game_exception",
+                "message_params": {"message": str(e)},
+            }
 
     def get_telemetry_status(self):
         """
@@ -1983,11 +2236,11 @@ class AppApi:
                 current_time = time.time()
                 if current_time - last_update >= update_interval or progress >= 100:
                     char = next(spinner)
-                    msg_js = json.dumps(
-                        f"[扫描] 正在检索存储设备... [{char}] {progress}%",
-                        ensure_ascii=False,
+                    self._call_app_method(
+                        "updateSearchLogI18n",
+                        "log.search.scanning",
+                        {"char": char, "progress": progress},
                     )
-                    self._window.evaluate_js(f"app.updateSearchLog({msg_js})")
                     last_update = current_time
 
             time.sleep(0.3)
@@ -2569,10 +2822,7 @@ class AppApi:
                     return
                 try:
                     safe_pct = max(0, min(100, int(pct)))
-                    msg_js = json.dumps(str(msg or ""), ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update({safe_pct}, {msg_js})"
-                    )
+                    self.update_loading_ui(safe_pct, msg)
                 except Exception:
                     pass
 
@@ -2900,12 +3150,16 @@ class AppApi:
         # 将进度与提示文本推送到前端加载组件 MinimalistLoading。
         if self._window:
             try:
-                safe_msg = str(message).replace("\r", " ").replace("\n", " ")
                 safe_progress = max(0, min(100, int(progress)))
-                msg_js = json.dumps(safe_msg, ensure_ascii=True)
-                self._window.evaluate_js(
-                    f"if(window.MinimalistLoading) MinimalistLoading.update({safe_progress}, {msg_js})"
-                )
+                payload = self._runtime_loading_i18n_payload(message)
+                if payload:
+                    self._update_loading_i18n(safe_progress, payload["key"], payload["params"])
+                else:
+                    safe_msg = str(message).replace("\r", " ").replace("\n", " ")
+                    msg_js = json.dumps(safe_msg, ensure_ascii=True)
+                    self._window.evaluate_js(
+                        f"if(window.MinimalistLoading) MinimalistLoading.update({safe_progress}, {msg_js})"
+                    )
             except Exception as e:
                 log.error(f"Loading UI 更新失败: {e}")
 
@@ -2934,7 +3188,8 @@ class AppApi:
             self._password_value = None
             self._password_cancelled = False
         name_js = json.dumps(str(archive_name or ""), ensure_ascii=False)
-        err_js = json.dumps(str(error_hint or ""), ensure_ascii=False)
+        payload = self._coerce_i18n_payload(error_hint)
+        err_js = json.dumps(payload if payload else str(error_hint or ""), ensure_ascii=False)
         self._window.evaluate_js(f"app.openArchivePasswordModal({name_js}, {err_js})")
         self._password_event.wait()
         with self._password_lock:
@@ -2951,16 +3206,13 @@ class AppApi:
 
         # 显示加载组件（关闭自动模拟，由后端推送真实进度）
         if self._window:
-            msg_js = json.dumps("正在准备导入...", ensure_ascii=False)
-            self._window.evaluate_js(
-                f"if(window.MinimalistLoading) MinimalistLoading.show(false, {msg_js})"
-            )
+            self._show_loading_i18n("loading.import.prepare")
             self.update_loading_ui(1, "开始扫描待解压区...")
 
         def _run():
             try:
                 def password_provider(archive_path, reason):
-                    hint = "密码错误，请重试" if reason == "incorrect" else ""
+                    hint = self._i18n_payload("modal.archive_password_incorrect") if reason == "incorrect" else ""
                     return self._request_archive_password(Path(archive_path).name, hint)
 
                 self._lib_mgr.unzip_zips_to_library(
@@ -2971,10 +3223,7 @@ class AppApi:
                 # 完成后通知前端刷新列表
                 if self._window:
                     self._window.evaluate_js("app.refreshLibrary()")
-                    msg_js = json.dumps("导入完成", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.import.done")
             except ArchivePasswordCanceled:
                 log.warning("已取消输入密码，导入已终止")
                 if self._window:
@@ -2984,10 +3233,7 @@ class AppApi:
             except Exception as e:
                 log.error(f"导入失败: {e}")
                 if self._window:
-                    msg_js = json.dumps("导入失败", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.import.failed")
             finally:
                 self._is_busy = False
 
@@ -3023,19 +3269,14 @@ class AppApi:
 
             # 显示加载条
             if self._window:
-                msg_js = json.dumps(
-                    f"准备导入: {Path(zip_path).name}", ensure_ascii=False
-                )
-                self._window.evaluate_js(
-                    f"if(window.MinimalistLoading) MinimalistLoading.show(false, {msg_js})"
-                )
+                self._show_loading_i18n("loading.import.prepare_named", {"name": Path(zip_path).name})
 
             def _run():
                 try:
                     self.update_loading_ui(1, f"正在读取: {Path(zip_path).name}")
 
                     def password_provider(archive_path, reason):
-                        hint = "密码错误，请重试" if reason == "incorrect" else ""
+                        hint = self._i18n_payload("modal.archive_password_incorrect") if reason == "incorrect" else ""
                         return self._request_archive_password(Path(archive_path).name, hint)
 
                     self._lib_mgr.unzip_single_zip(
@@ -3047,10 +3288,7 @@ class AppApi:
                     # 完成后通知前端刷新列表
                     if self._window:
                         self._window.evaluate_js("app.refreshLibrary()")
-                        msg_js = json.dumps("导入完成", ensure_ascii=False)
-                        self._window.evaluate_js(
-                            f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                        )
+                        self._update_loading_i18n(100, "loading.import.done")
                 except ArchivePasswordCanceled:
                     log.warning("已取消输入密码，导入已终止")
                     if self._window:
@@ -3060,10 +3298,7 @@ class AppApi:
                 except Exception as e:
                     log.error(f"导入失败: {e}")
                     if self._window:
-                        msg_js = json.dumps("导入失败", ensure_ascii=False)
-                        self._window.evaluate_js(
-                            f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                        )
+                        self._update_loading_i18n(100, "loading.import.failed")
                 finally:
                     self._is_busy = False
 
@@ -3083,17 +3318,14 @@ class AppApi:
         self._is_busy = True
 
         if self._window:
-            msg_js = json.dumps(f"准备导入: {Path(zip_path).name}", ensure_ascii=False)
-            self._window.evaluate_js(
-                f"if(window.MinimalistLoading) MinimalistLoading.show(false, {msg_js})"
-            )
+            self._show_loading_i18n("loading.import.prepare_named", {"name": Path(zip_path).name})
 
         def _run():
             try:
                 self.update_loading_ui(1, f"正在读取: {Path(zip_path).name}")
 
                 def password_provider(archive_path, reason):
-                    hint = "密码错误，请重试" if reason == "incorrect" else ""
+                    hint = self._i18n_payload("modal.archive_password_incorrect") if reason == "incorrect" else ""
                     return self._request_archive_password(Path(archive_path).name, hint)
 
                 self._lib_mgr.unzip_single_zip(
@@ -3104,10 +3336,7 @@ class AppApi:
 
                 if self._window:
                     self._window.evaluate_js("app.refreshLibrary()")
-                    msg_js = json.dumps("导入完成", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.import.done")
             except ArchivePasswordCanceled:
                 log.warning("已取消输入密码，导入已终止")
                 if self._window:
@@ -3115,10 +3344,7 @@ class AppApi:
             except Exception as e:
                 log.error(f"导入失败: {e}")
                 if self._window:
-                    msg_js = json.dumps("导入失败", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.import.failed")
             finally:
                 self._is_busy = False
 
@@ -4700,10 +4926,7 @@ class AppApi:
         self._is_busy = True
 
         if self._window:
-            msg_js = json.dumps(f"涂装解压: {Path(zip_path).name}", ensure_ascii=False)
-            self._window.evaluate_js(
-                f"if(window.MinimalistLoading) MinimalistLoading.show(false, {msg_js})"
-            )
+            self._show_loading_i18n("loading.skin.extracting_named", {"name": Path(zip_path).name})
 
         def _run():
             try:
@@ -4712,10 +4935,7 @@ class AppApi:
                 )
                 if self._window:
                     self._window.evaluate_js("if(app.refreshSkins) app.refreshSkins()")
-                    msg_js = json.dumps("涂装导入完成", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.skin.import_done")
             except FileExistsError as e:
                 log.warning(f"{e}")
                 if self._window:
@@ -4726,10 +4946,7 @@ class AppApi:
             except Exception as e:
                 log.error(f"涂装导入失败: {e}")
                 if self._window:
-                    msg_js = json.dumps("涂装导入失败", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.skin.import_failed")
             finally:
                 self._is_busy = False
 
@@ -4860,16 +5077,13 @@ class AppApi:
                             failed_count = result.get("failed", 0)
                             if failed_count > 0:
                                 # 部分成功
-                                msg = f"安装完成，但有 {failed_count} 个文件复制失败"
-                                msg_js = json.dumps(msg, ensure_ascii=False)
-                                self._window.evaluate_js(
-                                    f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
+                                self._update_loading_i18n(
+                                    100,
+                                    "loading.install.done_with_failed_files",
+                                    {"count": failed_count},
                                 )
                             else:
-                                msg_js = json.dumps("安装完成", ensure_ascii=False)
-                                self._window.evaluate_js(
-                                    f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                                )
+                                self._update_loading_i18n(100, "loading.install.done")
                             self._window.evaluate_js(
                                 f"if(app.onInstallSuccess) app.onInstallSuccess('{mod_name}')"
                             )
@@ -4878,36 +5092,35 @@ class AppApi:
                             error_msg = result.get("error", "")
                             failed_count = result.get("failed", 0)
                             if error_msg:
-                                msg = f"安装失败：{error_msg}"
+                                self._update_loading_i18n(
+                                    100,
+                                    "loading.install.failed_with_reason",
+                                    {"reason": error_msg},
+                                )
                             elif failed_count > 0:
-                                msg = f"安装失败：{failed_count} 个文件复制失败"
+                                self._update_loading_i18n(
+                                    100,
+                                    "loading.install.failed_file_count",
+                                    {"count": failed_count},
+                                )
                             else:
-                                msg = "安装失败"
-                            msg_js = json.dumps(msg, ensure_ascii=False)
-                            self._window.evaluate_js(
-                                f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                            )
+                                self._update_loading_i18n(100, "loading.install.failed")
                     else:
                         # 兼容旧版返回 bool 的情况
                         if result:
                             self._window.evaluate_js(
                                 f"if(app.onInstallSuccess) app.onInstallSuccess('{mod_name}')"
                             )
-                            msg_js = json.dumps("安装完成", ensure_ascii=False)
-                            self._window.evaluate_js(
-                                f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                            )
+                            self._update_loading_i18n(100, "loading.install.done")
                         else:
-                            msg_js = json.dumps("安装失败", ensure_ascii=False)
-                            self._window.evaluate_js(
-                                f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                            )
+                            self._update_loading_i18n(100, "loading.install.failed")
             except Exception as e:
                 log.error(f"安装失败: {e}")
                 if self._window:
-                    msg_js = json.dumps(f"安装失败：{e}", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
+                    self._update_loading_i18n(
+                        100,
+                        "loading.install.failed_with_reason",
+                        {"reason": e},
                     )
             finally:
                 with self._lock:
@@ -5525,10 +5738,7 @@ class AppApi:
         self._is_busy = True
 
         if self._window:
-            msg_js = json.dumps(f"炮镜安装: {Path(sight_path).name}", ensure_ascii=False)
-            self._window.evaluate_js(
-                f"if(window.MinimalistLoading) MinimalistLoading.show(false, {msg_js})"
-            )
+            self._show_loading_i18n("loading.sight.installing_named", {"name": Path(sight_path).name})
 
         def _run():
             try:
@@ -5539,11 +5749,11 @@ class AppApi:
                 )
                 if self._window:
                     self._window.evaluate_js("if(app.refreshSights) app.refreshSights({manual:true})")
-                    msg = result.get("message") or "炮镜导入完成"
-                    msg_js = json.dumps(msg, ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    payload = self._runtime_loading_i18n_payload(result.get("message") or "炮镜导入完成")
+                    if payload:
+                        self._update_loading_i18n(100, payload["key"], payload["params"])
+                    else:
+                        self.update_loading_ui(100, result.get("message") or "炮镜导入完成")
             except FileExistsError as e:
                 log.warning(f"{e}")
                 if self._window:
@@ -5554,10 +5764,7 @@ class AppApi:
             except Exception as e:
                 log.error(f"炮镜导入失败: {e}")
                 if self._window:
-                    msg_js = json.dumps(str(e) or "炮镜导入失败", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self.update_loading_ui(100, str(e) or "炮镜导入失败")
             finally:
                 self._is_busy = False
 
@@ -5584,10 +5791,7 @@ class AppApi:
         self._is_busy = True
 
         if self._window:
-            msg_js = json.dumps(f"炮镜解压: {Path(zip_path).name}", ensure_ascii=False)
-            self._window.evaluate_js(
-                f"if(window.MinimalistLoading) MinimalistLoading.show(false, {msg_js})"
-            )
+            self._show_loading_i18n("loading.sight.extracting_named", {"name": Path(zip_path).name})
 
         def _run():
             try:
@@ -5596,10 +5800,7 @@ class AppApi:
                 )
                 if self._window:
                     self._window.evaluate_js("if(app.refreshSights) app.refreshSights()")
-                    msg_js = json.dumps("炮镜导入完成", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.sight.import_done")
             except FileExistsError as e:
                 log.warning(f"{e}")
                 if self._window:
@@ -5610,10 +5811,7 @@ class AppApi:
             except Exception as e:
                 log.error(f"炮镜导入失败: {e}")
                 if self._window:
-                    msg_js = json.dumps("炮镜导入失败", ensure_ascii=False)
-                    self._window.evaluate_js(
-                        f"if(window.MinimalistLoading) MinimalistLoading.update(100, {msg_js})"
-                    )
+                    self._update_loading_i18n(100, "loading.sight.import_failed")
             finally:
                 self._is_busy = False
 
@@ -6319,6 +6517,23 @@ def main() -> int:
                             resource_view=resource_view,
                             paths=paths,
                         )
+                        return
+
+                    if active_page == "page-sight" or (active_page == "page-camo" and resource_view == "sights"):
+                        record_diagnostic_event(
+                            "drag_drop",
+                            "skip_sight_requires_frontend_options",
+                            "info",
+                            "炮镜拖入需要前端弹窗确认导入目标",
+                            active_page=active_page,
+                            resource_view=resource_view,
+                        )
+                        threading.Thread(
+                            target=_show_backend_drop_warning,
+                            args=("请在炮镜库区域拖入文件，并在弹窗中选择导入位置。",),
+                            name="DragDropSightTargetNotice",
+                            daemon=True,
+                        ).start()
                         return
 
                     archive_path = archive_files[0]
