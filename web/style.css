@@ -579,6 +579,7 @@ i[class^="ri-"] {
     display: flex;
     align-items: baseline;
     gap: 6px;
+    white-space: nowrap;
 }
 
 .app-brand-text {
@@ -601,6 +602,7 @@ i[class^="ri-"] {
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: var(--brand-text-fill, transparent);
+    white-space: nowrap;
 }
 
 /* 2. 中间导航菜单 */

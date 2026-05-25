@@ -46,7 +46,26 @@ func parseBannerItems(raw any) ([]BannerItem, error) {
 	if err := json.Unmarshal(data, &items); err != nil {
 		return nil, err
 	}
+	for i := range items {
+		items[i].TrackingType = normalizeBannerTrackingType(items[i].TrackingType)
+		items[i].TrackingID = strings.TrimSpace(items[i].TrackingID)
+		if len(items[i].TrackingID) > 64 {
+			items[i].TrackingID = items[i].TrackingID[:64]
+		}
+		if items[i].TrackingType == "none" {
+			items[i].TrackingID = ""
+		}
+	}
 	return items, nil
+}
+
+func normalizeBannerTrackingType(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "activity", "ad":
+		return strings.ToLower(strings.TrimSpace(raw))
+	default:
+		return "none"
+	}
 }
 
 func intValue(raw any) (int, bool) {
@@ -1697,6 +1716,10 @@ func initRouter(r *gin.Engine) {
 			c.JSON(400, gin.H{"error": "请求数据格式错误"})
 			return
 		}
+		req.MachineID = strings.TrimSpace(req.MachineID)
+		req.AdMedium = strings.TrimSpace(req.AdMedium)
+		req.AdID = strings.TrimSpace(req.AdID)
+		req.TargetURL = strings.TrimSpace(req.TargetURL)
 		if req.AdMedium == "" || req.AdID == "" {
 			c.JSON(400, gin.H{"error": "ad_medium 和 ad_id 为必填"})
 			return
@@ -1718,12 +1741,12 @@ func initRouter(r *gin.Engine) {
 			req.TargetURL = req.TargetURL[:2048]
 		}
 
-		// 去重：同一用户 + 同一广告 2 分钟内只记录 1 次
+		// 去重：同一用户 + 同一广告位 + 同一广告 2 分钟内只记录 1 次
 		if req.MachineID != "" {
 			var recentCount int64
 			threshold := time.Now().Add(-2 * time.Minute)
 			db.Model(&AdClickEvent{}).
-				Where("machine_id = ? AND ad_id = ? AND created_at > ?", req.MachineID, req.AdID, threshold).
+				Where("machine_id = ? AND ad_medium = ? AND ad_id = ? AND created_at > ?", req.MachineID, req.AdMedium, req.AdID, threshold).
 				Count(&recentCount)
 			if recentCount > 0 {
 				c.JSON(200, gin.H{"status": "deduplicated"})

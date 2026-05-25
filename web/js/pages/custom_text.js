@@ -374,13 +374,13 @@ const CustomText = {
 
         const overlay = document.createElement('div');
         overlay.id = 'modal-custom-text-backup';
-        overlay.className = 'modal-overlay show';
+        overlay.className = 'custom-text-backup-overlay';
         overlay.onclick = (e) => {
             if (e.target === overlay) this.closeBackupRestoreDialog(overlay);
         };
 
         const modal = document.createElement('div');
-        modal.className = 'modal-content custom-text-backup-modal';
+        modal.className = 'custom-text-backup-modal';
         modal.onclick = (e) => e.stopPropagation();
 
         // 备份列表 HTML
@@ -496,10 +496,22 @@ const CustomText = {
     closeBackupRestoreDialog(overlay) {
         if (!overlay || overlay.dataset.closing === '1') return;
         overlay.dataset.closing = '1';
-        overlay.classList.add('hiding');
-        setTimeout(() => {
-            overlay.remove();
-        }, 220);
+        overlay.classList.add('closing');
+
+        const removeOverlay = () => {
+            if (overlay && overlay.parentNode) {
+                overlay.remove();
+            }
+        };
+
+        const onAnimationEnd = (event) => {
+            if (event.target !== overlay) return;
+            overlay.removeEventListener('animationend', onAnimationEnd);
+            removeOverlay();
+        };
+
+        overlay.addEventListener('animationend', onAnimationEnd);
+        setTimeout(removeOverlay, 260);
     },
 
     async backupData() {
@@ -606,7 +618,7 @@ const CustomText = {
                     <div class="import-result-icon ${iconClass}">${iconSymbol}</div>
                     <span>${titleText}</span>
                 </div>
-                <button class="import-result-close" onclick="CustomText.closeImportResult(this.closest('.import-result-overlay'), ${tempDir ? `'${tempDir}'` : 'null'})">×</button>
+                <button class="import-result-close" type="button" data-import-result-close>×</button>
             </div>
             <div class="import-result-body">
                 ${this.renderImportSummary(result, importedCount, skippedCount)}
@@ -616,7 +628,7 @@ const CustomText = {
                 ${skippedCount > 0 && tempDir ? this.renderSkippedFilesSection(skippedFiles, tempDir) : ''}
             </div>
             <div class="import-result-footer">
-                <button class="import-result-btn import-result-btn-primary" onclick="CustomText.closeImportResult(this.closest('.import-result-overlay'), ${tempDir ? `'${tempDir}'` : 'null'})">
+                <button class="import-result-btn import-result-btn-primary" type="button" data-import-result-close>
                     ${skippedCount > 0 && tempDir ? '稍后处理' : '确定'}
                 </button>
             </div>
@@ -624,6 +636,15 @@ const CustomText = {
 
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
+
+        modal.querySelectorAll('[data-import-result-close]').forEach((button) => {
+            button.onclick = () => this.closeImportResult(overlay, tempDir);
+        });
+
+        const manualImportBtn = modal.querySelector('.manual-import-confirm-btn');
+        if (manualImportBtn) {
+            manualImportBtn.onclick = () => this.confirmManualImportInline(manualImportBtn, tempDir);
+        }
     },
 
     renderSkippedFilesSection(skippedFiles, tempDir) {
@@ -655,7 +676,7 @@ const CustomText = {
                     ${fileListHtml}
                 </div>
                 <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
-                    <button class="import-result-btn import-result-btn-primary" onclick="CustomText.confirmManualImportInline(this, '${tempDir}')">
+                    <button class="import-result-btn import-result-btn-primary manual-import-confirm-btn" type="button">
                         <i class="ri-check-line"></i> 确认导入选中的文件
                     </button>
                 </div>
@@ -663,12 +684,12 @@ const CustomText = {
         `;
     },
 
-    closeImportResult(overlay, tempDir) {
-        overlay.remove();
-
-        // 如果有临时目录，通知后端清理
+    async closeImportResult(overlay, tempDir) {
+        if (overlay && overlay.parentNode) {
+            overlay.remove();
+        }
         if (tempDir) {
-            this.cleanupTempDir(tempDir);
+            await this.cleanupTempDir(tempDir);
         }
     },
 
@@ -698,21 +719,6 @@ const CustomText = {
 
         // 执行导入
         this.executeManualImport(tempDir, selectedFiles);
-    },
-
-    async closeImportResult(overlay, tempDir) {
-        // 如果有临时目录，清理它
-        if (tempDir) {
-            try {
-                await pywebview.api.import_custom_text_manual({
-                    selected_files: [],
-                    temp_dir: tempDir
-                });
-            } catch (e) {
-                console.error('清理临时目录失败:', e);
-            }
-        }
-        overlay.remove();
     },
 
     async handleSkippedFiles(skippedFiles, originalFilePath) {

@@ -247,13 +247,43 @@
 /* ================================================
    备份 / 还原弹窗 – 现代设计
    ================================================ */
+.custom-text-backup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 38%),
+        var(--modal-overlay-bg, rgba(0, 0, 0, 0.56));
+    opacity: 0;
+    backdrop-filter: blur(4px) saturate(0.96);
+    -webkit-backdrop-filter: blur(4px) saturate(0.96);
+    animation: customTextBackupOverlayIn 0.22s ease-out forwards;
+}
+
+.custom-text-backup-overlay.closing {
+    animation: customTextBackupOverlayOut 0.2s ease-in forwards;
+}
+
+.custom-text-backup-overlay.closing .custom-text-backup-modal {
+    animation: backupModalOut 0.18s ease-in forwards;
+}
+
 .custom-text-backup-modal {
     width: min(620px, calc(100vw - 64px));
     max-height: calc(100vh - 64px);
     min-width: 0;
     min-height: 0;
     padding: 0;
+    background: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
     text-align: left;
+    display: flex;
+    flex-direction: column;
     justify-content: flex-start;
     position: relative;
     overflow: hidden;
@@ -266,10 +296,29 @@
         0 0 0 1px color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
+@keyframes customTextBackupOverlayIn {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes customTextBackupOverlayOut {
+    to {
+        opacity: 0;
+    }
+}
+
 @keyframes backupModalIn {
     to {
         transform: scale(1);
         opacity: 1;
+    }
+}
+
+@keyframes backupModalOut {
+    to {
+        transform: scale(0.97) translateY(6px);
+        opacity: 0;
     }
 }
 

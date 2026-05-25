@@ -391,6 +391,9 @@
                                         <button class="res-quick-link" onclick="app.importSkinZipDialog()">
                                             <i class="ri-upload-2-line"></i> <span data-i18n="resource.import_skin_file">导入涂装文件</span>
                                         </button>
+                                        <button class="res-quick-link" onclick="app.openUserskinsResidueModal()">
+                                            <i class="ri-search-eye-line"></i> <span data-i18n="resource.userskins_residue_check">UserSkins残留检测</span>
+                                        </button>
                                         <button class="res-quick-link" onclick="app.refreshSkins({manual:true})" id="btn-refresh-skins">
                                             <i class="ri-refresh-line"></i> <span data-i18n="resource.refresh_list">刷新列表</span>
                                         </button>
@@ -1702,6 +1705,48 @@
                         <i class="ri-file-copy-line"></i> <span data-i18n="copy_country.copy_radio">复制无线电</span>
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-userskins-residue">
+        <div class="modal-content userskins-residue-modal">
+            <div class="userskins-residue-head">
+                <div class="userskins-residue-icon"><i class="ri-search-eye-line"></i></div>
+                <div>
+                    <h2 data-i18n="userskins_residue.title">UserSkins残留检测</h2>
+                    <p data-i18n="userskins_residue.desc">每一个战争雷霆安装目录都有自己的涂装文件夹，通常来说是Steam版本和官方版本，它们并不互通，此功能能够让您选择主版本并将另一个版本的涂装文件迁移到主版本。</p>
+                </div>
+            </div>
+
+            <div class="userskins-residue-progress" id="userskins-residue-progress" hidden>
+                <div class="userskins-residue-progress-info">
+                    <span id="userskins-residue-progress-text" data-i18n="userskins_residue.ready">等待检测</span>
+                    <span id="userskins-residue-progress-percent">0%</span>
+                </div>
+                <div class="userskins-residue-progress-bar">
+                    <div id="userskins-residue-progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="userskins-residue-result" id="userskins-residue-result">
+                <div class="userskins-residue-empty" data-i18n="userskins_residue.initial_hint">点击检测后，AimerWT 会检查当前游戏路径、Steam库和官方客户端常见目录。</div>
+            </div>
+
+            <label class="userskins-residue-current-option" id="userskins-residue-current-option" hidden>
+                <input type="checkbox" id="userskins-residue-set-current" checked>
+                <span class="checkbox-box"></span>
+                <span data-i18n="userskins_residue.set_current">迁移后将主版本设为当前涂装库路径</span>
+            </label>
+
+            <div class="modal-actions userskins-residue-actions">
+                <button class="btn secondary" onclick="app.closeModal('modal-userskins-residue')" data-i18n="common.cancel">取消</button>
+                <button class="btn primary" id="btn-userskins-residue-scan" onclick="app.scanUserskinsResidue()">
+                    <i class="ri-search-line"></i> <span data-i18n="userskins_residue.scan">检测</span>
+                </button>
+                <button class="btn primary" id="btn-userskins-residue-migrate" onclick="app.migrateUserskinsResidue()" hidden>
+                    <i class="ri-file-copy-2-line"></i> <span data-i18n="userskins_residue.copy_migrate">复制迁移</span>
+                </button>
             </div>
         </div>
     </div>

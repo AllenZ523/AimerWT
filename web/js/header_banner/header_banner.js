@@ -21,6 +21,9 @@
     var _timer = null;
     var _update_dismissed = false;
     var _currentUpdateKey = null;
+    var HEADER_BANNER_EDGE_GAP = 10;
+    var _resizeObserver = null;
+    var _resizeRaf = null;
 
     var DEFAULT_SLOGANS = [];
 
@@ -81,26 +84,7 @@
             });
         }
 
-        // 仅当文字宽度超出容器时才启用滚动动画（所有类型统一逻辑）
-        requestAnimationFrame(function () {
-            var textEl = el.querySelector('.header_banner_text');
-            var clipEl = textEl ? textEl.parentElement : null;
-            if (!textEl) return;
-            var clipWidth = textEl.parentElement.clientWidth;
-            var textWidth = textEl.scrollWidth;
-            if (clipEl) clipEl.classList.remove('is-scrolling');
-            textEl.classList.remove('is_scrolling');
-            // 文字能够完全容纳在容器内，则静态显示
-            if (textWidth <= clipWidth + 2) return;
-            // 文字超出容器，启用滚动
-            textEl.style.setProperty('--clip-width', clipWidth + 'px');
-            textEl.style.setProperty('--scroll-offset', '-' + textWidth + 'px');
-            var totalTravel = clipWidth + textWidth;
-            var duration = Math.max(5, totalTravel / 30);
-            textEl.style.setProperty('--scroll-duration', duration + 's');
-            if (clipEl) clipEl.classList.add('is-scrolling');
-            textEl.classList.add('is_scrolling');
-        });
+        syncTextScroll(el);
 
         // Hover tooltip
         el.addEventListener('mouseenter', function () {
@@ -121,8 +105,9 @@
             document.body.appendChild(_tooltipEl);
         }
         _tooltipEl.textContent = text;
-        var rect = _container.getBoundingClientRect();
-        _tooltipEl.style.left = rect.left + 'px';
+        var bannerEl = _container.querySelector('.header_banner');
+        var rect = (bannerEl || _container).getBoundingClientRect();
+        _tooltipEl.style.left = (rect.left + rect.width / 2) + 'px';
         _tooltipEl.style.top = (rect.bottom + 6) + 'px';
         requestAnimationFrame(function () {
             if (_tooltipEl) _tooltipEl.classList.add('visible');
@@ -135,23 +120,46 @@
         }
     }
 
+    function getTrackingMedium(tracking) {
+        var mediumMap = {
+            ad: 'header_banner_ad',
+            activity: 'header_banner_activity'
+        };
+        return tracking ? (mediumMap[tracking.type] || '') : '';
+    }
+
+    function getTrackingId(tracking) {
+        if (!tracking || tracking.id == null) return '';
+        return String(tracking.id).trim().substring(0, 64);
+    }
+
+    function appendTrackedUtm(url, tracking) {
+        var medium = getTrackingMedium(tracking);
+        var adId = getTrackingId(tracking);
+        if (!medium || !adId || !window.AimerUtm || !window.AimerUtm.appendUtm) return url;
+        return window.AimerUtm.appendUtm(url, medium, adId);
+    }
+
+    function reportTrackedClick(action, targetUrl) {
+        var medium = getTrackingMedium(action && action.tracking);
+        var adId = getTrackingId(action && action.tracking);
+        if (!medium || !adId || !window.AimerUtm || !window.AimerUtm.reportClick) return;
+        window.AimerUtm.reportClick(medium, adId, targetUrl || '');
+    }
+
     function handleAction(action, bannerText) {
         if (!action) return;
 
         if (action.type === 'url' && action.url) {
-            var contentId = (bannerText || '').substring(0, 32);
-            var tracked = (window.AimerUtm && window.AimerUtm.appendUtm)
-                ? window.AimerUtm.appendUtm(action.url, 'header_banner', contentId)
-                : action.url;
-            if (window.AimerUtm && window.AimerUtm.reportClick) {
-                window.AimerUtm.reportClick('header_banner', contentId, action.url);
-            }
+            var tracked = appendTrackedUtm(action.url, action.tracking);
+            reportTrackedClick(action, action.url);
             if (window.app && typeof window.app.openExternal === 'function') {
                 window.app.openExternal(tracked);
             } else {
                 window.open(tracked, '_blank');
             }
         } else if (action.type === 'alert') {
+            reportTrackedClick(action, action.url || ('banner-alert:' + getTrackingId(action.tracking)));
             if (window.app && typeof window.app.showAlert === 'function') {
                 window.app.showAlert(
                     action.title || '系统通知',
@@ -208,20 +216,74 @@
         startRotation();
     }
 
+    function syncTextScroll(el) {
+        if (!el) return;
+        // 仅当文字宽度超出容器时才启用滚动动画（所有类型统一逻辑）
+        requestAnimationFrame(function () {
+            var textEl = el.querySelector('.header_banner_text');
+            var clipEl = textEl ? textEl.parentElement : null;
+            if (!textEl || !clipEl) return;
+            var clipWidth = clipEl.clientWidth;
+            var textWidth = textEl.scrollWidth;
+            clipEl.classList.remove('is-scrolling');
+            textEl.classList.remove('is_scrolling');
+            textEl.style.removeProperty('--clip-width');
+            textEl.style.removeProperty('--scroll-offset');
+            textEl.style.removeProperty('--scroll-duration');
+            // 文字能够完全容纳在容器内，则静态显示
+            if (textWidth <= clipWidth + 2) return;
+            // 文字超出容器，启用滚动
+            textEl.style.setProperty('--clip-width', clipWidth + 'px');
+            textEl.style.setProperty('--scroll-offset', '-' + textWidth + 'px');
+            var totalTravel = clipWidth + textWidth;
+            var duration = Math.max(5, totalTravel / 30);
+            textEl.style.setProperty('--scroll-duration', duration + 's');
+            clipEl.classList.add('is-scrolling');
+            textEl.classList.add('is_scrolling');
+        });
+    }
+
+    function scheduleCalcMaxWidth() {
+        if (_resizeRaf) cancelAnimationFrame(_resizeRaf);
+        _resizeRaf = requestAnimationFrame(function () {
+            _resizeRaf = null;
+            calcMaxWidth();
+        });
+    }
+
     function calcMaxWidth() {
         if (!_container) return;
         var headerLeft = document.querySelector('.header-left');
+        var brandWrapper = document.querySelector('.app-brand-wrapper');
         var headerNav = document.querySelector('.header-nav');
+        var headerRight = document.querySelector('.header-right');
         var header = document.querySelector('.app-header');
-        if (headerLeft && headerNav && header) {
+        if (headerLeft && header && (headerNav || headerRight)) {
             var headerRect = header.getBoundingClientRect();
-            var pl = parseFloat(getComputedStyle(header).paddingLeft) || 0;
-            var leftEnd = headerLeft.getBoundingClientRect().right - headerRect.left - pl;
-            var navStart = headerNav.getBoundingClientRect().left - headerRect.left - pl;
-            var available = navStart - leftEnd - 8;
-            _container.style.left = (leftEnd + 4) + 'px';
+            var leftTarget = brandWrapper || headerLeft;
+            var rightTarget = headerNav || headerRight;
+            var leftEnd = leftTarget.getBoundingClientRect().right - headerRect.left;
+            var rightStart = rightTarget.getBoundingClientRect().left - headerRect.left;
+            var available = rightStart - leftEnd - (HEADER_BANNER_EDGE_GAP * 2);
+            _container.style.left = (leftEnd + HEADER_BANNER_EDGE_GAP) + 'px';
             _container.style.width = Math.max(available, 0) + 'px';
+
+            syncTextScroll(_container.querySelector('.header_banner'));
         }
+    }
+
+    function bindResizeObserver() {
+        if (!window.ResizeObserver) return;
+        if (_resizeObserver) _resizeObserver.disconnect();
+
+        var header = document.querySelector('.app-header');
+        var brandWrapper = document.querySelector('.app-brand-wrapper');
+        var headerNav = document.querySelector('.header-nav');
+        var headerRight = document.querySelector('.header-right');
+        _resizeObserver = new ResizeObserver(scheduleCalcMaxWidth);
+        [header, brandWrapper, headerNav, headerRight].forEach(function (el) {
+            if (el) _resizeObserver.observe(el);
+        });
     }
 
     function init() {
@@ -229,7 +291,8 @@
         if (!_container) return;
 
         calcMaxWidth();
-        window.addEventListener('resize', calcMaxWidth);
+        bindResizeObserver();
+        window.addEventListener('resize', scheduleCalcMaxWidth);
 
         _items = DEFAULT_SLOGANS.slice();
         refreshDisplay();

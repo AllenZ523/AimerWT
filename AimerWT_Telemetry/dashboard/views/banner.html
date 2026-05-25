@@ -117,7 +117,7 @@
                     </div>
                     <div class="form-group" style="margin: 0;">
                         <label style="margin-bottom: 6px;">点击动作</label>
-                        <select class="select" style="width: 100%;" id="bannerEditActionType" onchange="app.toggleBannerActionFields()">
+                        <select class="select" style="width: 100%;" id="bannerEditActionType" onchange="app.toggleBannerActionFields();app.toggleBannerTrackingFields()">
                             <option value="none">无操作（仅展示文字）</option>
                             <option value="url">打开链接</option>
                             <option value="alert">弹窗详情</option>
@@ -125,7 +125,7 @@
                     </div>
                     <div class="form-group" style="margin: 0; display: none;" id="bannerEditUrlGroup">
                         <label style="margin-bottom: 6px;">链接地址</label>
-                        <input class="input" style="width: 100%;" id="bannerEditUrl" placeholder="https://...">
+                        <input class="input" style="width: 100%;" id="bannerEditUrl" placeholder="https://..." oninput="app.toggleBannerTrackingFields()">
                     </div>
                     <div id="bannerEditAlertGroup" style="display: none; flex-direction: column; gap: 14px;">
                         <div class="form-group" style="margin: 0;">
@@ -136,6 +136,21 @@
                             <label style="margin-bottom: 6px;">弹窗内容</label>
                             <textarea class="input" style="width: 100%; height: 80px; font-family: inherit; padding: 10px; resize: vertical;" id="bannerEditAlertContent" placeholder="点击 Banner 后弹出的详细内容..."></textarea>
                         </div>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="margin-bottom: 6px;">点击统计</label>
+                        <select class="select" style="width: 100%;" id="bannerEditTrackingType" onchange="app.toggleBannerTrackingFields()">
+                            <option value="none">不计入点击统计</option>
+                            <option value="activity">自运营活动</option>
+                            <option value="ad">商业广告</option>
+                        </select>
+                        <div id="bannerEditTrackingHint" style="display: none; margin-top: 6px; font-size: 12px; color: var(--text-muted);">
+                            此 Banner 有点击动作但未计入点击统计
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin: 0; display: none;" id="bannerEditTrackingGroup">
+                        <label style="margin-bottom: 6px;">统计 ID</label>
+                        <input class="input" style="width: 100%;" id="bannerEditTrackingId" placeholder="如 accelerator_2026_06">
                     </div>
                     <div style="display: flex; gap: 10px; margin-top: 4px;">
                         <button class="btn primary" style="flex: 1; justify-content: center;" onclick="app.saveBannerItem()">保存并发布</button>
@@ -157,7 +172,7 @@
             </div>
             <div>
                 <div style="font-weight: 600; color: var(--text); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></svg>可定制</div>
-                <div>文字、图标(Remix Icon)、文字颜色、图标颜色、点击动作。</div>
+                <div>文字、图标(Remix Icon)、文字颜色、图标颜色、点击动作、点击统计。</div>
             </div>
             <div>
                 <div style="font-weight: 600; color: var(--text); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>数据链路</div>

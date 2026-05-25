@@ -1895,6 +1895,53 @@ const app = {
         if (alertGroup) alertGroup.style.display = type === 'alert' ? 'flex' : 'none';
     },
 
+    normalizeBannerTrackingType(type) {
+        const normalized = String(type || 'none').trim().toLowerCase();
+        return ['activity', 'ad'].includes(normalized) ? normalized : 'none';
+    },
+
+    sanitizeBannerTrackingId(raw) {
+        return String(raw || '').trim().substring(0, 64);
+    },
+
+    bannerTrackingLabel(type) {
+        const map = { activity: '活动统计', ad: '广告统计' };
+        return map[this.normalizeBannerTrackingType(type)] || '';
+    },
+
+    generateBannerTrackingId(type) {
+        const prefix = this.normalizeBannerTrackingType(type) === 'ad' ? 'banner_ad' : 'banner_activity';
+        const d = new Date();
+        const pad = (value) => String(value).padStart(2, '0');
+        return `${prefix}_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    },
+
+    normalizeBannerItemForEdit(item) {
+        const source = item || {};
+        const trackingType = this.normalizeBannerTrackingType(source.tracking_type);
+        return {
+            ...source,
+            tracking_type: trackingType,
+            tracking_id: trackingType === 'none' ? '' : this.sanitizeBannerTrackingId(source.tracking_id)
+        };
+    },
+
+    toggleBannerTrackingFields() {
+        const actionType = document.getElementById('bannerEditActionType')?.value || 'none';
+        const url = (document.getElementById('bannerEditUrl')?.value || '').trim();
+        const trackingType = this.normalizeBannerTrackingType(document.getElementById('bannerEditTrackingType')?.value);
+        const trackingGroup = document.getElementById('bannerEditTrackingGroup');
+        const hint = document.getElementById('bannerEditTrackingHint');
+        const trackingInput = document.getElementById('bannerEditTrackingId');
+        const hasClickableAction = actionType === 'alert' || (actionType === 'url' && !!url);
+
+        if (trackingGroup) trackingGroup.style.display = trackingType === 'none' ? 'none' : '';
+        if (hint) hint.style.display = hasClickableAction && trackingType === 'none' ? '' : 'none';
+        if (trackingType !== 'none' && trackingInput && !this.sanitizeBannerTrackingId(trackingInput.value)) {
+            trackingInput.value = this.generateBannerTrackingId(trackingType);
+        }
+    },
+
     async loadBannerStatus() {
         try {
             const res = await fetch(`${this.config.apiBase}/admin/control`);
@@ -1913,19 +1960,21 @@ const app = {
             if (document.getElementById('bannerInterval') && cfg.banner_interval)
                 document.getElementById('bannerInterval').value = cfg.banner_interval;
 
-            this._bannerItems = Array.isArray(cfg.banner_items) ? cfg.banner_items : [];
+            this._bannerItems = Array.isArray(cfg.banner_items)
+                ? cfg.banner_items.map((item) => this.normalizeBannerItemForEdit(item))
+                : [];
             if (!this._bannerItems.length && cfg.notice_content) {
-                this._bannerItems = [{
+                this._bannerItems = [this.normalizeBannerItemForEdit({
                     type: 'announcement', text: cfg.notice_content, icon: 'ri-megaphone-line',
                     color: '', icon_color: '',
                     action_type: cfg.notice_action_type || 'none',
                     action_url: cfg.notice_action_url || '',
                     action_title: cfg.notice_action_title || '',
                     action_content: cfg.notice_action_content || ''
-                }];
+                })];
             }
             if (!this._bannerItems.length && cfg.update_active && cfg.update_content) {
-                this._bannerItems = [{
+                this._bannerItems = [this.normalizeBannerItemForEdit({
                     type: 'update',
                     text: cfg.update_content,
                     icon: 'ri-download-2-line',
@@ -1935,7 +1984,7 @@ const app = {
                     action_url: cfg.update_url || '',
                     action_title: '',
                     action_content: ''
-                }];
+                })];
             }
             this.renderBannerList();
             if (this._bannerItems.length) this.editBannerItem(0);
@@ -1966,6 +2015,7 @@ const app = {
         container.innerHTML = this._bannerItems.map((item, i) => {
             const label = tl[item.type] || item.type;
             const color = tc[item.type] || 'var(--text-muted)';
+            const trackingLabel = this.bannerTrackingLabel(item.tracking_type);
             return `<div style="border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='rgba(0,0,0,0.02)'" onmouseout="this.style.background=''" onclick="app.editBannerItem(${i})">
                 <div style="width:28px;height:28px;border-radius:6px;background:${color}15;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                     <i class="${this.escapeHtmlSafe(item.icon || 'ri-megaphone-line')}" style="font-size:14px;color:${color};"></i>
@@ -1975,6 +2025,7 @@ const app = {
                     <div style="font-size:11px;color:var(--text-muted);display:flex;gap:8px;margin-top:2px;">
                         <span style="color:${color};">${label}</span>
                         ${item.action_type && item.action_type !== 'none' ? '<span>· ' + (item.action_type === 'url' ? '链接' : '弹窗') + '</span>' : ''}
+                        ${trackingLabel ? '<span>· ' + trackingLabel + '</span>' : ''}
                     </div>
                 </div>
                 <div style="display:flex;gap:4px;flex-shrink:0;">
@@ -2003,7 +2054,10 @@ const app = {
         this.setVal('bannerEditUrl', '');
         this.setVal('bannerEditAlertTitle', '');
         this.setVal('bannerEditAlertContent', '');
+        this.setVal('bannerEditTrackingType', 'none');
+        this.setVal('bannerEditTrackingId', '');
         this.toggleBannerActionFields();
+        this.toggleBannerTrackingFields();
         this.updateIconPreview();
     },
 
@@ -2026,7 +2080,10 @@ const app = {
         this.setVal('bannerEditUrl', item.action_url || '');
         this.setVal('bannerEditAlertTitle', item.action_title || '');
         this.setVal('bannerEditAlertContent', item.action_content || '');
+        this.setVal('bannerEditTrackingType', this.normalizeBannerTrackingType(item.tracking_type));
+        this.setVal('bannerEditTrackingId', this.sanitizeBannerTrackingId(item.tracking_id));
         this.toggleBannerActionFields();
+        this.toggleBannerTrackingFields();
         this.updateIconPreview();
     },
 
@@ -2043,6 +2100,19 @@ const app = {
     saveBannerItem() {
         const text = (document.getElementById('bannerEditText')?.value || '').trim();
         if (!text) { this.showAlert('请输入显示文字', 'warning'); return; }
+        const trackingType = this.normalizeBannerTrackingType(document.getElementById('bannerEditTrackingType')?.value);
+        let trackingId = this.sanitizeBannerTrackingId(document.getElementById('bannerEditTrackingId')?.value);
+        if (trackingType !== 'none' && !trackingId) trackingId = this.generateBannerTrackingId(trackingType);
+        if (trackingType !== 'none' && trackingId) {
+            const duplicate = this._bannerItems.some((existing, index) => (
+                index !== this._bannerEditingIndex &&
+                this.normalizeBannerTrackingType(existing.tracking_type) !== 'none' &&
+                this.sanitizeBannerTrackingId(existing.tracking_id) === trackingId
+            ));
+            if (duplicate && !window.confirm('已有 Banner 使用相同统计 ID，请确认是否归为同一活动或广告。')) {
+                return;
+            }
+        }
         const item = {
             type: document.getElementById('bannerEditType')?.value || 'announcement',
             text, icon: (document.getElementById('bannerEditIcon')?.value || '').trim() || 'ri-megaphone-line',
@@ -2051,7 +2121,9 @@ const app = {
             action_type: document.getElementById('bannerEditActionType')?.value || 'none',
             action_url: (document.getElementById('bannerEditUrl')?.value || '').trim(),
             action_title: (document.getElementById('bannerEditAlertTitle')?.value || '').trim(),
-            action_content: (document.getElementById('bannerEditAlertContent')?.value || '').trim()
+            action_content: (document.getElementById('bannerEditAlertContent')?.value || '').trim(),
+            tracking_type: trackingType,
+            tracking_id: trackingType === 'none' ? '' : trackingId
         };
         if (this._bannerEditingIndex >= 0) this._bannerItems[this._bannerEditingIndex] = item;
         else this._bannerItems.push(item);
@@ -7766,7 +7838,13 @@ Aimer WT涂装系统：
      * 广告位类型中文名映射
      */
     adMediumLabel(medium) {
-        const map = { carousel: '轮播图', header_banner: '横幅', notice: '公告' };
+        const map = {
+            carousel: '轮播图广告',
+            header_banner_ad: 'Banner 广告',
+            header_banner_activity: 'Banner 活动',
+            header_banner: '横幅（旧数据）',
+            notice: '公告'
+        };
         return map[medium] || medium || '未知';
     },
 

@@ -17,6 +17,7 @@
 - 所有操作记录完整的错误上下文
 """
 import base64
+import hashlib
 import os
 import platform
 import re
@@ -29,6 +30,11 @@ from typing import Callable, Any
 
 from services.resource_index_cache import ResourceIndexCache
 from utils.logger import get_logger
+
+try:
+    import winreg
+except ImportError:
+    winreg = None
 
 log = get_logger(__name__)
 
@@ -83,6 +89,316 @@ class SkinsManager:
             UserSkins 目录路径
         """
         return Path(str(game_path)) / "UserSkins"
+
+    def discover_userskins_locations(
+        self,
+        configured_game_path: str | Path | None = None,
+        extra_game_paths: list[str | Path] | None = None,
+    ) -> dict[str, Any]:
+        """
+        查找本机可能存在的 War Thunder UserSkins 目录，用于识别 Steam/官方客户端之间的涂装目录差异。
+        """
+        candidates = self._collect_userskins_game_candidates(configured_game_path, extra_game_paths)
+        current_key = self._path_key(configured_game_path) if configured_game_path else ""
+        folders = []
+
+        for game_path in candidates:
+            userskins_dir = self.get_userskins_dir(game_path)
+            valid_game = self._check_is_wt_dir(game_path)
+            if not valid_game and not userskins_dir.exists():
+                continue
+
+            summary = self._summarize_userskins_dir(userskins_dir)
+            install_type = self._classify_game_path(game_path)
+            folders.append({
+                "id": self._location_id(userskins_dir),
+                "install_type": install_type,
+                "install_label": self._install_type_label(install_type),
+                "game_path": str(game_path),
+                "userskins_path": str(userskins_dir),
+                "exists": userskins_dir.exists(),
+                "valid_game": valid_game,
+                "is_current": self._path_key(game_path) == current_key if current_key else False,
+                **summary,
+            })
+
+        folders.sort(key=lambda item: (
+            not bool(item.get("is_current")),
+            str(item.get("install_type") or "unknown"),
+            str(item.get("userskins_path") or "").lower(),
+        ))
+        return {
+            "success": True,
+            "current_game_path": str(configured_game_path or ""),
+            "folders": folders,
+        }
+
+    def migrate_userskins_items(
+        self,
+        source_userskins_path: str | Path,
+        target_userskins_path: str | Path,
+    ) -> dict[str, Any]:
+        """
+        将来源 UserSkins 下的涂装文件夹复制到目标 UserSkins；同名文件夹默认跳过，不覆盖、不删除来源。
+        """
+        source_dir = Path(source_userskins_path).expanduser().resolve()
+        target_dir = Path(target_userskins_path).expanduser().resolve()
+        self._validate_userskins_migration_paths(source_dir, target_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        copied = []
+        skipped = []
+        failed = []
+
+        entries = sorted((entry for entry in source_dir.iterdir() if entry.is_dir()), key=lambda p: p.name.lower())
+        for entry in entries:
+            target_entry = target_dir / entry.name
+            if target_entry.exists():
+                skipped.append(entry.name)
+                continue
+            try:
+                shutil.copytree(entry, target_entry)
+                copied.append(entry.name)
+            except Exception as exc:
+                failed.append({"name": entry.name, "error": str(exc)})
+
+        if copied:
+            self._clear_cache()
+
+        return {
+            "success": len(failed) == 0,
+            "source_path": str(source_dir),
+            "target_path": str(target_dir),
+            "copied": copied,
+            "skipped": skipped,
+            "failed": failed,
+            "copied_count": len(copied),
+            "skipped_count": len(skipped),
+            "failed_count": len(failed),
+        }
+
+    def _collect_userskins_game_candidates(
+        self,
+        configured_game_path: str | Path | None = None,
+        extra_game_paths: list[str | Path] | None = None,
+    ) -> list[Path]:
+        candidates: list[Path] = []
+
+        def add_candidate(path_value: str | Path | None) -> None:
+            if not path_value:
+                return
+            try:
+                path = Path(path_value).expanduser()
+            except Exception:
+                return
+            key = self._path_key(path)
+            if not key:
+                return
+            if any(self._path_key(existing) == key for existing in candidates):
+                return
+            candidates.append(path)
+
+        add_candidate(configured_game_path)
+        for path in extra_game_paths or []:
+            add_candidate(path)
+
+        for path in self._steam_warthunder_candidates():
+            add_candidate(path)
+        for path in self._official_warthunder_candidates():
+            add_candidate(path)
+
+        return candidates
+
+    def _steam_warthunder_candidates(self) -> list[Path]:
+        candidates = []
+        for library_root in self._steam_library_roots():
+            candidates.append(library_root / "steamapps" / "common" / "War Thunder")
+        return candidates
+
+    def _steam_library_roots(self) -> list[Path]:
+        roots: list[Path] = []
+
+        def add_root(path_value: str | Path | None) -> None:
+            if not path_value:
+                return
+            try:
+                path = Path(path_value).expanduser()
+            except Exception:
+                return
+            key = self._path_key(path)
+            if key and not any(self._path_key(root) == key for root in roots):
+                roots.append(path)
+
+        if winreg:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam")
+                steam_path_str, _ = winreg.QueryValueEx(key, "SteamPath")
+                winreg.CloseKey(key)
+                add_root(steam_path_str)
+            except Exception:
+                pass
+
+        for env_name in ("ProgramFiles(x86)", "ProgramFiles"):
+            base = os.environ.get(env_name)
+            if base:
+                add_root(Path(base) / "Steam")
+
+        if platform.system() == "Windows":
+            for drive in "CDEFGHIJK":
+                drive_root = Path(f"{drive}:\\")
+                add_root(drive_root / "Steam")
+                add_root(drive_root / "SteamLibrary")
+        else:
+            home = Path.home()
+            add_root(home / ".local/share/Steam")
+            add_root(home / ".steam/steam")
+
+        parsed_roots = list(roots)
+        for root in parsed_roots:
+            library_vdf = root / "steamapps" / "libraryfolders.vdf"
+            for parsed in self._parse_steam_libraryfolders(library_vdf):
+                add_root(parsed)
+
+        return roots
+
+    def _parse_steam_libraryfolders(self, library_vdf: Path) -> list[Path]:
+        if not library_vdf.exists():
+            return []
+        try:
+            text = library_vdf.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return []
+        paths = []
+        for match in re.finditer(r'"path"\s+"([^"]+)"', text):
+            raw = match.group(1).replace("\\\\", "\\")
+            paths.append(Path(raw))
+        return paths
+
+    def _official_warthunder_candidates(self) -> list[Path]:
+        candidates = []
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(Path(local_app_data) / "WarThunder")
+
+        for env_name in ("ProgramFiles(x86)", "ProgramFiles"):
+            base = os.environ.get(env_name)
+            if base:
+                candidates.append(Path(base) / "WarThunder")
+                candidates.append(Path(base) / "War Thunder")
+
+        if platform.system() == "Windows":
+            for drive in "CDEFGHIJK":
+                drive_root = Path(f"{drive}:\\")
+                candidates.extend([
+                    drive_root / "WarThunder",
+                    drive_root / "War Thunder",
+                    drive_root / "Games" / "War Thunder",
+                ])
+        else:
+            home = Path.home()
+            candidates.extend([
+                home / "WarThunder",
+                home / "War Thunder",
+                home / ".local/share/WarThunder",
+            ])
+        return candidates
+
+    def _summarize_userskins_dir(self, userskins_dir: Path) -> dict[str, Any]:
+        if not userskins_dir.exists() or not userskins_dir.is_dir():
+            return {
+                "item_count": 0,
+                "file_count": 0,
+                "total_size_bytes": 0,
+                "mtime": 0,
+                "truncated": False,
+            }
+
+        total_size = 0
+        file_count = 0
+        mtime = 0
+        try:
+            mtime = userskins_dir.stat().st_mtime
+            entries = sorted([entry for entry in userskins_dir.iterdir() if entry.is_dir()], key=lambda p: p.name.lower())
+            for entry in entries[:500]:
+                try:
+                    mtime = max(mtime, entry.stat().st_mtime)
+                except Exception:
+                    pass
+                size_bytes, count = self._get_dir_size_and_count_fast(entry)
+                total_size += size_bytes
+                file_count += count
+            return {
+                "item_count": len(entries),
+                "file_count": file_count,
+                "total_size_bytes": total_size,
+                "mtime": mtime,
+                "truncated": len(entries) > 500,
+            }
+        except Exception as exc:
+            log.warning(f"统计 UserSkins 目录失败: {userskins_dir} - {exc}")
+            return {
+                "item_count": 0,
+                "file_count": 0,
+                "total_size_bytes": 0,
+                "mtime": mtime,
+                "truncated": False,
+            }
+
+    def _classify_game_path(self, game_path: str | Path) -> str:
+        normalized = str(game_path).replace("\\", "/").lower()
+        name_key = Path(game_path).name.lower().replace(" ", "")
+        if "/steamapps/common/war thunder" in normalized:
+            return "steam"
+        if name_key == "warthunder":
+            return "official"
+        return "unknown"
+
+    def _install_type_label(self, install_type: str) -> str:
+        if install_type == "steam":
+            return "Steam 版"
+        if install_type == "official":
+            return "官方客户端"
+        return "未知来源"
+
+    def _check_is_wt_dir(self, path: str | Path) -> bool:
+        try:
+            game_path = Path(path)
+            if not game_path.exists() or not game_path.is_dir():
+                return False
+            valid_markers = ["config.blk", "beac_wt_mlauncher.exe", "gaijin_downloader.exe", "launcher.exe", "aces.exe"]
+            return any((game_path / marker).exists() for marker in valid_markers)
+        except Exception:
+            return False
+
+    def _validate_userskins_migration_paths(self, source_dir: Path, target_dir: Path) -> None:
+        if source_dir.name.lower() != "userskins" or target_dir.name.lower() != "userskins":
+            raise ValueError("只能迁移 UserSkins 目录")
+        if not source_dir.exists() or not source_dir.is_dir():
+            raise FileNotFoundError(f"来源 UserSkins 不存在: {source_dir}")
+        if self._path_key(source_dir) == self._path_key(target_dir):
+            raise ValueError("来源和目标 UserSkins 不能相同")
+        source_text = str(source_dir)
+        target_text = str(target_dir)
+        try:
+            common_path = os.path.commonpath([source_text, target_text])
+        except ValueError:
+            common_path = ""
+        except Exception:
+            common_path = ""
+        if common_path in (source_text, target_text):
+            raise ValueError("来源和目标 UserSkins 不能互相嵌套")
+
+    def _path_key(self, path_value: str | Path | None) -> str:
+        if not path_value:
+            return ""
+        try:
+            return os.path.normcase(str(Path(path_value).expanduser().resolve(strict=False)))
+        except Exception:
+            return os.path.normcase(str(path_value))
+
+    def _location_id(self, path_value: str | Path) -> str:
+        key = self._path_key(path_value)
+        return hashlib.sha1(key.encode("utf-8", errors="ignore")).hexdigest()[:12]
 
     def scan_userskins(
         self, 

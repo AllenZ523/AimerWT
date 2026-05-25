@@ -1,4 +1,4 @@
-const DEFAULT_THEME = {
+﻿const DEFAULT_THEME = {
     "--primary": "#FF9900",
     "--primary-hover": "#e68a00",
     "--bg-body": "#F5F7FA",
@@ -1356,6 +1356,336 @@ const app = {
         }
         if (!window.pywebview?.api?.import_skin_zip_dialog) return;
         pywebview.api.import_skin_zip_dialog();
+    },
+
+    openUserskinsResidueModal() {
+        this.userskinsResidueData = null;
+        this.userskinsResidueTargetPath = "";
+        const modal = document.getElementById('modal-userskins-residue');
+        const resultEl = document.getElementById('userskins-residue-result');
+        const currentOption = document.getElementById('userskins-residue-current-option');
+        const migrateBtn = document.getElementById('btn-userskins-residue-migrate');
+        const scanBtn = document.getElementById('btn-userskins-residue-scan');
+        if (!modal || !resultEl) return;
+        resultEl.innerHTML = `<div class="userskins-residue-empty">${this._escapeHtml(this.t('userskins_residue.initial_hint'))}</div>`;
+        if (currentOption) currentOption.hidden = true;
+        if (migrateBtn) migrateBtn.hidden = true;
+        if (scanBtn) {
+            scanBtn.disabled = false;
+            scanBtn.innerHTML = `<i class="ri-search-line"></i> <span>${this.t('userskins_residue.scan')}</span>`;
+        }
+        this._setUserskinsResidueProgress(0, this.t('userskins_residue.ready'), true);
+        if (window.I18N) I18N.applyToDOM(modal);
+        this.openModal('modal-userskins-residue');
+    },
+
+    _setUserskinsResidueProgress(progress, text, hidden = false) {
+        const wrap = document.getElementById('userskins-residue-progress');
+        const fill = document.getElementById('userskins-residue-progress-fill');
+        const percentEl = document.getElementById('userskins-residue-progress-percent');
+        const textEl = document.getElementById('userskins-residue-progress-text');
+        const safeProgress = Math.max(0, Math.min(100, Number(progress || 0)));
+        if (wrap) wrap.hidden = !!hidden;
+        if (fill) fill.style.width = `${safeProgress}%`;
+        if (percentEl) percentEl.textContent = `${Math.round(safeProgress)}%`;
+        if (textEl) textEl.textContent = text || '';
+    },
+
+    _setUserskinsResidueBusy(isBusy, mode = 'scan') {
+        const scanBtn = document.getElementById('btn-userskins-residue-scan');
+        const migrateBtn = document.getElementById('btn-userskins-residue-migrate');
+        if (scanBtn) {
+            scanBtn.disabled = !!isBusy;
+            scanBtn.innerHTML = isBusy && mode === 'scan'
+                ? `<i class="ri-loader-4-line"></i> <span>${this.t('userskins_residue.scanning')}</span>`
+                : `<i class="ri-search-line"></i> <span>${this.t('userskins_residue.scan')}</span>`;
+        }
+        if (migrateBtn) {
+            migrateBtn.disabled = !!isBusy;
+            if (isBusy && mode === 'migrate') {
+                migrateBtn.innerHTML = `<i class="ri-loader-4-line"></i> <span>${this.t('userskins_residue.migrating')}</span>`;
+            } else {
+                migrateBtn.innerHTML = `<i class="ri-file-copy-2-line"></i> <span>${this.t('userskins_residue.copy_migrate')}</span>`;
+            }
+        }
+    },
+
+    async scanUserskinsResidue() {
+        const api = window.pywebview?.api;
+        if (!api?.discover_userskins_residue) {
+            this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
+            return;
+        }
+
+        const resultEl = document.getElementById('userskins-residue-result');
+        if (resultEl) {
+            resultEl.innerHTML = `<div class="userskins-residue-empty">${this._escapeHtml(this.t('userskins_residue.scanning_hint'))}</div>`;
+        }
+        this._setUserskinsResidueBusy(true, 'scan');
+        this._setUserskinsResidueProgress(0, this.t('userskins_residue.ready'), false);
+
+        // 1. 开启 API 异步查询
+        const apiPromise = api.discover_userskins_residue();
+
+        // 2. 开启 1.5 - 2 秒的随机线性进度步进
+        const duration = 1500 + Math.random() * 500;
+        const stepTime = 30;
+        const totalSteps = duration / stepTime;
+
+        const progressPromise = new Promise((resolve) => {
+            let step = 0;
+            const interval = setInterval(() => {
+                step += 1;
+                const currentProgress = Math.min(100, (step / totalSteps) * 100);
+
+                let text = this.t('userskins_residue.progress_current');
+                if (currentProgress > 45) {
+                    text = this.t('userskins_residue.progress_scan');
+                }
+
+                this._setUserskinsResidueProgress(currentProgress, text, false);
+
+                if (step >= totalSteps) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, stepTime);
+        });
+
+        try {
+            // 3. 并行等待 API 返回以及进度条平滑走到 100%
+            const [data] = await Promise.all([apiPromise, progressPromise]);
+
+            if (!data || !data.success) {
+                this._setUserskinsResidueProgress(100, this.t('userskins_residue.scan_failed'));
+                this.showAlert(this.t('common.error'), data?.msg || this.t('userskins_residue.scan_failed'), 'error');
+                return;
+            }
+
+            this.userskinsResidueData = data;
+            this._setUserskinsResidueProgress(100, this.t('userskins_residue.scan_done'), false);
+
+            // 给 100% 极光进度条 180ms 优雅定格，再淡出结果，提供踏实平滑的视觉质感
+            await new Promise(resolve => setTimeout(resolve, 180));
+            this._setUserskinsResidueProgress(100, this.t('userskins_residue.scan_done'), true);
+            this._renderUserskinsResidueResult(data);
+        } catch (e) {
+            console.error('scanUserskinsResidue failed:', e);
+            this._setUserskinsResidueProgress(100, this.t('userskins_residue.scan_failed'));
+            this.showAlert(this.t('common.error'), this.t('common.call_failed', { message: e?.message || e }), 'error');
+        } finally {
+            this._setUserskinsResidueBusy(false, 'scan');
+        }
+    },
+
+    _renderUserskinsResidueResult(data) {
+        const resultEl = document.getElementById('userskins-residue-result');
+        const currentOption = document.getElementById('userskins-residue-current-option');
+        if (!resultEl) return;
+        const folders = Array.isArray(data?.folders) ? data.folders : [];
+        const visibleFolders = folders.filter(item => item && (item.exists || item.valid_game || Number(item.item_count || 0) > 0));
+        if (visibleFolders.length === 0) {
+            resultEl.innerHTML = `<div class="userskins-residue-empty">${this._escapeHtml(this.t('userskins_residue.not_found'))}</div>`;
+            if (currentOption) currentOption.hidden = true;
+            this._updateUserskinsResiduePlan();
+            return;
+        }
+
+        const preferred = visibleFolders.find(item => item.is_current && item.valid_game)
+            || visibleFolders.find(item => item.valid_game);
+        this.userskinsResidueTargetPath = preferred?.userskins_path || "";
+
+        const locationHtml = visibleFolders.map((item) => {
+            const userskinsPath = String(item.userskins_path || '');
+            const checked = userskinsPath === this.userskinsResidueTargetPath ? ' checked' : '';
+            const disabled = item.valid_game ? '' : ' disabled';
+            const disabledClass = item.valid_game ? '' : ' is-disabled';
+            const itemCount = Number(item.item_count || 0);
+            const sizeText = this._formatStorageBytes(item.total_size_bytes || 0);
+            const statusText = this._userskinsResidueStatusText(item);
+
+            // 智能选择平台图标
+            const iconClass = item.install_type === 'steam' ? 'ri-steam-fill' : 'ri-computer-line';
+
+            // 胶囊 Badge 颜色映射
+            let badgeClass = 'badge-source';
+            if (item.is_current) badgeClass = 'badge-current';
+            else if (!item.valid_game && item.exists) badgeClass = 'badge-residue';
+            else if (itemCount <= 0) badgeClass = 'badge-empty';
+
+            return `
+                <label class="userskins-residue-location${checked ? ' selected' : ''}${disabledClass}">
+                    <input type="radio" name="userskins-residue-target" value="${this._escapeHtml(userskinsPath)}"${checked}${disabled}>
+                    <div class="userskins-residue-location-main">
+                        <div class="userskins-residue-location-title">
+                            <div class="title-text">
+                                <i class="${iconClass}"></i>
+                                <span>${this._escapeHtml(item.install_label || this._userskinsResidueVersionText(item))}</span>
+                            </div>
+                            <em class="${badgeClass}">${this._escapeHtml(statusText)}</em>
+                        </div>
+                        <div class="userskins-residue-location-meta">
+                            <span><i class="ri-folder-image-line"></i> ${this.t('userskins_residue.skin_count', { count: itemCount })}</span>
+                            <span><i class="ri-database-2-line"></i> ${this._escapeHtml(sizeText)}</span>
+                        </div>
+                        <div class="userskins-residue-path" title="${this._escapeHtml(userskinsPath)}">${this._escapeHtml(userskinsPath)}</div>
+                    </div>
+                </label>
+            `;
+        }).join('');
+
+        resultEl.innerHTML = `
+            <div class="userskins-residue-summary">
+                <strong>${this.t('userskins_residue.found_count', { count: visibleFolders.length })}</strong>
+                <span>${this.t('userskins_residue.choose_main')}</span>
+            </div>
+            <div class="userskins-residue-list">${locationHtml}</div>
+            <div class="userskins-residue-plan" id="userskins-residue-plan"></div>
+        `;
+
+        resultEl.querySelectorAll('input[name="userskins-residue-target"]').forEach((input) => {
+            input.addEventListener('change', () => this.selectUserskinsResidueTarget(input.value));
+        });
+        this._updateUserskinsResiduePlan();
+    },
+
+    _userskinsResidueVersionText(item) {
+        if (item?.install_type === 'steam') return this.t('userskins_residue.type_steam');
+        if (item?.install_type === 'official') return this.t('userskins_residue.type_official');
+        return this.t('userskins_residue.type_unknown');
+    },
+
+    _userskinsResidueStatusText(item) {
+        if (item?.is_current) return this.t('userskins_residue.status_current');
+        if (!item?.valid_game && item?.exists) return this.t('userskins_residue.status_residue');
+        if (Number(item?.item_count || 0) <= 0) return this.t('userskins_residue.status_empty');
+        return this.t('userskins_residue.status_source');
+    },
+
+    selectUserskinsResidueTarget(userskinsPath) {
+        this.userskinsResidueTargetPath = String(userskinsPath || '');
+        document.querySelectorAll('.userskins-residue-location').forEach((label) => {
+            const input = label.querySelector('input[name="userskins-residue-target"]');
+            label.classList.toggle('selected', input?.value === this.userskinsResidueTargetPath);
+        });
+        this._updateUserskinsResiduePlan();
+    },
+
+    _getUserskinsResidueSelection() {
+        const folders = Array.isArray(this.userskinsResidueData?.folders) ? this.userskinsResidueData.folders : [];
+        const target = folders.find(item => String(item.userskins_path || '') === String(this.userskinsResidueTargetPath || ''));
+        const sources = target
+            ? folders.filter(item => String(item.userskins_path || '') !== String(target.userskins_path || '') && Number(item.item_count || 0) > 0)
+            : [];
+        return { target, sources };
+    },
+
+    _updateUserskinsResiduePlan() {
+        const planEl = document.getElementById('userskins-residue-plan');
+        const migrateBtn = document.getElementById('btn-userskins-residue-migrate');
+        const currentOption = document.getElementById('userskins-residue-current-option');
+        const setCurrent = document.getElementById('userskins-residue-set-current');
+        const { target, sources } = this._getUserskinsResidueSelection();
+
+        if (!target) {
+            if (planEl) planEl.innerHTML = `<i class="ri-error-warning-line warn"></i> <span class="warn">${this.t('userskins_residue.no_target')}</span>`;
+            if (migrateBtn) migrateBtn.hidden = true;
+            if (currentOption) currentOption.hidden = true;
+            return;
+        }
+
+        if (currentOption) currentOption.hidden = !target.valid_game;
+        if (setCurrent) {
+            setCurrent.checked = true;
+            setCurrent.disabled = !!target.is_current;
+        }
+
+        const totalSkins = sources.reduce((sum, item) => sum + Number(item.item_count || 0), 0);
+        if (planEl) {
+            planEl.innerHTML = sources.length > 0
+                ? `<i class="ri-shuffle-line"></i> <span>${this.t('userskins_residue.plan_copy', { sources: sources.length, count: totalSkins })}</span>`
+                : `<i class="ri-checkbox-circle-line"></i> <span>${this.t('userskins_residue.no_other_source')}</span>`;
+        }
+        if (migrateBtn) migrateBtn.hidden = sources.length === 0 || !target.valid_game;
+    },
+
+    async migrateUserskinsResidue() {
+        const api = window.pywebview?.api;
+        if (!api?.migrate_userskins_residue) {
+            this.showAlert(this.t('common.error'), this.t('common.feature_not_ready'), 'error');
+            return;
+        }
+        const { target, sources } = this._getUserskinsResidueSelection();
+        if (!target || sources.length === 0) {
+            this.showAlert(this.t('common.info'), this.t('userskins_residue.no_other_source'), 'warn');
+            return;
+        }
+
+        const confirmHtml = `
+            <div style="text-align:left;line-height:1.7;">
+                <div>${this._escapeHtml(this.t('userskins_residue.confirm_copy', { sources: sources.length, target: target.install_label || target.userskins_path }))}</div>
+                <div style="color:var(--text-sec);font-size:12px;margin-top:8px;">${this._escapeHtml(this.t('userskins_residue.copy_rule'))}</div>
+            </div>
+        `;
+        const confirmed = await this.confirm(
+            this.t('userskins_residue.copy_confirm_title'),
+            confirmHtml,
+            false,
+            this.t('userskins_residue.copy_migrate')
+        );
+        if (!confirmed) return;
+
+        this._setUserskinsResidueBusy(true, 'migrate');
+        let copiedCount = 0;
+        let skippedCount = 0;
+        let failedCount = 0;
+
+        try {
+            for (let i = 0; i < sources.length; i += 1) {
+                const source = sources[i];
+                const progress = 10 + Math.round((i / Math.max(1, sources.length)) * 75);
+                this._setUserskinsResidueProgress(progress, this.t('userskins_residue.progress_copying', { current: i + 1, total: sources.length }));
+                const result = await api.migrate_userskins_residue(source.userskins_path, target.userskins_path);
+                copiedCount += Number(result?.copied_count || 0);
+                skippedCount += Number(result?.skipped_count || 0);
+                failedCount += Number(result?.failed_count || 0);
+            }
+
+            const setCurrent = document.getElementById('userskins-residue-set-current');
+            if (setCurrent?.checked && target.valid_game && !target.is_current && api?.set_userskins_residue_game_path) {
+                const setResult = await api.set_userskins_residue_game_path(target.game_path);
+                if (setResult?.success) {
+                    await this.updatePathUI(setResult.path, true);
+                }
+            }
+
+            this._setUserskinsResidueProgress(100, this.t('userskins_residue.copy_done'));
+            const resultEl = document.getElementById('userskins-residue-result');
+            if (resultEl) {
+                resultEl.innerHTML = `
+                    <div class="userskins-residue-finish">
+                        <strong><i class="ri-checkbox-circle-fill"></i> ${this.t('userskins_residue.copy_done')}</strong>
+                        <span>${this.t('userskins_residue.copy_summary', { copied: copiedCount, skipped: skippedCount, failed: failedCount })}</span>
+                    </div>
+                `;
+            }
+            const currentOption = document.getElementById('userskins-residue-current-option');
+            const migrateBtn = document.getElementById('btn-userskins-residue-migrate');
+            if (currentOption) currentOption.hidden = true;
+            if (migrateBtn) migrateBtn.hidden = true;
+            this.refreshSkins({ manual: true });
+            this.showAlert(
+                failedCount > 0 ? this.t('common.warn') : this.t('common.success'),
+                this.t('userskins_residue.copy_summary', { copied: copiedCount, skipped: skippedCount, failed: failedCount }),
+                failedCount > 0 ? 'warn' : 'success'
+            );
+        } catch (e) {
+            console.error('migrateUserskinsResidue failed:', e);
+            this._setUserskinsResidueProgress(100, this.t('userskins_residue.copy_failed'));
+            this.showAlert(this.t('common.error'), this.t('common.call_failed', { message: e?.message || e }), 'error');
+        } finally {
+            this._setUserskinsResidueBusy(false, 'migrate');
+        }
     },
 
     async importSightsFileDialog() {
@@ -3434,9 +3764,9 @@ const app = {
                     <span style="margin: 0 5px; color:#ddd">|</span>
                     <i class="ri-hard-drive-2-line"></i> <span>${escapeHtml(sizeText)}</span>
                     <span style="margin: 0 5px; color:#ddd">|</span>
-                    
+
                     <div class="mod-lang-wrap" title="${escapeHtml(langTooltip)}" style="display:inline-flex; align-items:center; cursor:help;">
-                        <i class="ri-translate"></i> 
+                        <i class="ri-translate"></i>
                         <span style="margin-left:2px">${langHtml || escapeHtml(localize_lang('未识别'))}</span>
                     </div>
                 </div>
@@ -3444,7 +3774,7 @@ const app = {
                 <div class="mod-meta-row" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 20px;">
                     ${filesHtml}
                 </div>
-                
+
                 <div style="font-size:11px; color:var(--text-log); opacity:0.6; margin: 6px 0 8px; display:flex; align-items:center; gap:4px;">
                     <i class="ri-time-line"></i> ${escapeHtml(translate_or('mod.updated_at', { date: updateDate }, `更新于: ${updateDate}`))}
                 </div>

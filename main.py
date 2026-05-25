@@ -908,7 +908,7 @@ class AppApi:
             if not text:
                 continue
 
-            action_obj = item.get("action") if isinstance(item.get("action"), dict) else None
+            action_obj = dict(item.get("action")) if isinstance(item.get("action"), dict) else None
             if not action_obj:
                 action_type = str(item.get("action_type", "none") or "none").strip().lower()
                 if action_type == "url" and item.get("action_url"):
@@ -921,10 +921,21 @@ class AppApi:
                         "level": "info"
                     }
 
+            tracking_type = str(item.get("tracking_type", "none") or "none").strip().lower()
+            if tracking_type not in ("activity", "ad"):
+                tracking_type = "none"
+            tracking_id = str(item.get("tracking_id", "") or "").strip()[:64]
+            if tracking_type == "none":
+                tracking_id = ""
+            if action_obj and tracking_type in ("activity", "ad") and tracking_id:
+                action_obj["tracking"] = {"type": tracking_type, "id": tracking_id}
+
             normalized_item = {
                 "type": str(item.get("type", "announcement") or "announcement"),
                 "text": text,
                 "icon": str(item.get("icon", "ri-megaphone-line") or "ri-megaphone-line"),
+                "tracking_type": tracking_type,
+                "tracking_id": tracking_id,
             }
             if action_obj:
                 normalized_item["action"] = action_obj
@@ -4921,6 +4932,45 @@ class AppApi:
         self._apply_resource_display_names("skins", data)
         data["valid"] = True
         return data
+
+    def discover_userskins_residue(self):
+        # 搜索当前电脑上可能存在的多个 War Thunder UserSkins 目录，供前端迁移向导使用。
+        try:
+            game_path = self._cfg_mgr.get_game_path()
+            return self._skins_mgr.discover_userskins_locations(configured_game_path=game_path)
+        except Exception as e:
+            log.error(f"UserSkins 残留检测失败: {e}")
+            return {"success": False, "msg": str(e), "folders": []}
+
+    def migrate_userskins_residue(self, source_userskins_path, target_userskins_path):
+        # 将一个 UserSkins 的涂装文件夹复制到另一个 UserSkins；不覆盖同名项，不删除来源。
+        if self._is_busy:
+            return {"success": False, "msg": "另一个任务正在进行中，请稍候..."}
+        self._is_busy = True
+        try:
+            target_game_path = str(Path(str(target_userskins_path)).expanduser().parent)
+            valid, msg = self._logic.validate_game_path(target_game_path)
+            if not valid:
+                return {"success": False, "msg": msg or "目标游戏路径无效", "copied_count": 0, "skipped_count": 0, "failed_count": 1}
+            return self._skins_mgr.migrate_userskins_items(source_userskins_path, target_userskins_path)
+        except Exception as e:
+            log.error(f"UserSkins 迁移失败: {e}")
+            return {"success": False, "msg": str(e), "copied_count": 0, "skipped_count": 0, "failed_count": 1}
+        finally:
+            self._is_busy = False
+
+    def set_userskins_residue_game_path(self, game_path):
+        # 将迁移向导中选定的有效游戏目录设为当前涂装库路径。
+        try:
+            game_path = str(game_path or "")
+            valid, msg = self._logic.validate_game_path(game_path)
+            if not valid:
+                return {"success": False, "msg": msg or "路径无效"}
+            self._cfg_mgr.set_game_path(game_path)
+            return {"success": True, "path": game_path}
+        except Exception as e:
+            log.error(f"设置 UserSkins 主版本路径失败: {e}")
+            return {"success": False, "msg": str(e)}
 
     def import_skin_zip_dialog(self):
         if self._is_busy:

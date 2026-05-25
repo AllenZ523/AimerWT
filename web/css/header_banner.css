@@ -2,11 +2,12 @@
 #header_banner_slot {
     display: none;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     height: 100%;
     overflow: hidden;
     clip-path: inset(0);
     min-width: 0;
+    box-sizing: border-box;
     -webkit-app-region: no-drag;
     app-region: no-drag;
     position: absolute;
@@ -151,8 +152,9 @@
     transform: none;
 }
 
-/* 更新提示的脉冲圆点 */
+/* 圆点节点暂时保留，但不参与显示 */
 .header_banner_dot {
+    display: none;
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -290,11 +292,11 @@
     z-index: 9999;
     pointer-events: none;
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translate(-50%, -4px);
     transition: opacity 0.2s, transform 0.2s;
 }
 
 .header_banner_tooltip.visible {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
 }
