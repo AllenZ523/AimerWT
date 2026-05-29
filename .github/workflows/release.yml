@@ -152,6 +152,7 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
           REPORT_URL: ${{ secrets.REPORT_URL }}
+          TELEMETRY_CLIENT_SECRET: ${{ secrets.TELEMETRY_CLIENT_SECRET }}
           TELEMETRY_SALT: ${{ secrets.TELEMETRY_SALT }}
         run: |
           python scripts/build.py

@@ -627,7 +627,7 @@ window.I18N && I18N.register("zh_cn", {
 
     "support.title": "支持一下我",
     "support.subtitle": "非常感谢给我钱！你的支持是我持续更新的动力，本软件个人开发时长近1000小时啦！",
-    "support.cost_note": "还可以帮我减轻服务器和大模型API的成本！",
+    "support.cost_note": "还可以帮我减轻服务器成本！",
     "support.wechat_note": "如果您通过微信，或在此之前通过微信赞助过我，请带截图私聊我获取礼物！",
     "support.aifadian": "爱发电",
     "support.wechat_reward": "微信赞赏",

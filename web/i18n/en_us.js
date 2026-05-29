@@ -626,7 +626,7 @@ window.I18N && I18N.register("en_us", {
 
     "support.title": "Support Me",
     "support.subtitle": "Thank you for supporting me. Your support keeps this project moving, and I have spent nearly 1,000 hours building it.",
-    "support.cost_note": "It also helps cover server and large-model API costs.",
+    "support.cost_note": "It also helps cover server costs.",
     "support.wechat_note": "If you support me through WeChat, or have supported me through WeChat before, please message me with a screenshot to get a gift.",
     "support.aifadian": "Afdian",
     "support.wechat_reward": "WeChat Reward",

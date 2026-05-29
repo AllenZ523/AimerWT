@@ -626,7 +626,7 @@ window.I18N && I18N.register("ru_ru", {
 
     "support.title": "Поддержать",
     "support.subtitle": "Спасибо за поддержку. Она помогает проекту развиваться; на его создание уже ушло почти 1000 часов.",
-    "support.cost_note": "Также это помогает покрывать расходы на серверы и API больших моделей.",
+    "support.cost_note": "Также это помогает покрывать расходы на серверы.",
     "support.wechat_note": "Если вы поддержали меня через WeChat сейчас или раньше, напишите мне со скриншотом, чтобы получить подарок.",
     "support.aifadian": "Afdian",
     "support.wechat_reward": "WeChat Reward",
