@@ -2869,7 +2869,7 @@ const app = {
             const connected = await pywebview.api.get_telemetry_connection_status();
             var wasDisconnected = !this.telemetryConnected;
             this.telemetryConnected = !!connected;
-            if (window.pywebview?.api?.init_app_state && connected && (!this.userSeqId || wasDisconnected)) {
+            if (window.pywebview?.api?.init_app_state && connected) {
                 const st = await pywebview.api.init_app_state();
                 if (st && st.user_seq_id) { this.userSeqId = st.user_seq_id; window._userSeqId = st.user_seq_id; }
                 if (st && st.telemetry_base_url) window._telemetryBaseUrl = st.telemetry_base_url;

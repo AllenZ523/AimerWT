@@ -101,6 +101,20 @@ func lookupClientDeviceToken(machineID string) (ClientDeviceToken, error) {
 	return record, err
 }
 
+func maskMachineID(machineID string) string {
+	normalized := strings.TrimSpace(machineID)
+	if len(normalized) <= 16 {
+		return normalized
+	}
+	return normalized[:12] + "..." + normalized[len(normalized)-8:]
+}
+
+func lookupClientDeviceTokenByToken(token string) (ClientDeviceToken, error) {
+	var record ClientDeviceToken
+	err := db.Where("token_hash = ?", hashClientDeviceToken(token)).First(&record).Error
+	return record, err
+}
+
 func generateClientDeviceToken() (string, error) {
 	buf := make([]byte, clientDeviceTokenSize)
 	if _, err := rand.Read(buf); err != nil {
@@ -167,12 +181,23 @@ func ensureClientDeviceToken(c *gin.Context, machineID string, allowBootstrap bo
 	token := strings.TrimSpace(c.GetHeader(clientDeviceTokenHeader))
 	if token != "" {
 		if verifyClientDeviceToken(normalizedMachineID, token) {
+			c.Set("_clientDeviceTokenValid", true)
 			return true
+		}
+		if allowBootstrap {
+			if record, err := lookupClientDeviceTokenByToken(token); err == nil {
+				canonicalMachineID := strings.TrimSpace(record.MachineID)
+				if canonicalMachineID != "" && canonicalMachineID != normalizedMachineID {
+					c.Set("_canonicalMachineID", canonicalMachineID)
+					log.Printf("[Auth] 设备令牌匹配历史机器码，沿用既有 UID: %s -> %s", maskMachineID(normalizedMachineID), maskMachineID(canonicalMachineID))
+					return true
+				}
+			}
 		}
 		// token 验证失败：对于 /telemetry（allowBootstrap=true），自动重签
 		// 而非直接 403，以防止客户端进入死循环。
 		if allowBootstrap {
-			log.Printf("[Auth] 设备令牌验证失败，将自动重签: %s", normalizedMachineID)
+			log.Printf("[Auth] 设备令牌验证失败，将自动重签: %s", maskMachineID(normalizedMachineID))
 			c.Set("_deviceTokenRenew", true)
 			return true
 		}
@@ -184,7 +209,7 @@ func ensureClientDeviceToken(c *gin.Context, machineID string, allowBootstrap bo
 	if allowBootstrap {
 		if hasClientDeviceToken(normalizedMachineID) {
 			// 客户端丢失了 token 但服务端有记录 → 标记需要重签
-			log.Printf("[Auth] 客户端未携带设备令牌但服务端存在记录，将自动重签: %s", normalizedMachineID)
+			log.Printf("[Auth] 客户端未携带设备令牌但服务端存在记录，将自动重签: %s", maskMachineID(normalizedMachineID))
 			c.Set("_deviceTokenRenew", true)
 		}
 		return true

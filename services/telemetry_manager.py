@@ -24,6 +24,7 @@ import sys
 import threading
 import time
 import uuid
+from itertools import product
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -37,7 +38,10 @@ _PLACEHOLDER_REPORT_URLS = {
 }
 
 _DEVICE_TOKEN_FILE = get_docs_data_dir() / "telemetry_device_token.json"
+_MACHINE_ID_FILE = get_docs_data_dir() / "telemetry_machine_id.json"
+_MAX_MACHINE_ID_CANDIDATES = 64
 _device_token_lock = threading.Lock()
+_machine_id_lock = threading.Lock()
 
 
 def _load_device_token() -> str:
@@ -52,6 +56,64 @@ def _load_device_token() -> str:
 
 
 _client_device_token = _load_device_token()
+
+
+def _is_valid_machine_id(machine_id: str) -> bool:
+    normalized = str(machine_id or "").strip()
+    if len(normalized) != 64:
+        return False
+    return all(ch in "0123456789abcdefABCDEF" for ch in normalized)
+
+
+def _dedupe_machine_ids(machine_ids: list[str]) -> list[str]:
+    result = []
+    seen = set()
+    for machine_id in machine_ids:
+        normalized = str(machine_id or "").strip().lower()
+        if not _is_valid_machine_id(normalized) or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return result
+
+
+def _dedupe_text_values(values: list[str]) -> list[str]:
+    result = []
+    seen = set()
+    for value in values:
+        normalized = str(value or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return result
+
+
+def _load_persisted_machine_id() -> str:
+    try:
+        if not _MACHINE_ID_FILE.exists():
+            return ""
+        with open(_MACHINE_ID_FILE, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        machine_id = str(payload.get("machine_id", "") or "").strip()
+        return machine_id if _is_valid_machine_id(machine_id) else ""
+    except Exception:
+        return ""
+
+
+def _save_persisted_machine_id(machine_id: str) -> None:
+    normalized = str(machine_id or "").strip().lower()
+    if not _is_valid_machine_id(normalized):
+        return
+    with _machine_id_lock:
+        try:
+            _MACHINE_ID_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = _MACHINE_ID_FILE.with_suffix(".tmp")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump({"machine_id": normalized}, f, ensure_ascii=False)
+            tmp_path.replace(_MACHINE_ID_FILE)
+        except Exception:
+            pass
 
 
 def get_client_device_token() -> str:
@@ -189,11 +251,22 @@ class TelemetryManager:
         self.app_version = app_version
 
         self.report_url = resolve_report_url(report_url)
-        self._machine_id = self._generate_hwid()
+        self._candidate_lock = threading.Lock()
+        self._machine_id_candidates = self._generate_fast_hwid_candidates()
+        self._full_candidates_ready = False
+        self._candidate_refresh_started = False
+        self._machine_id = _load_persisted_machine_id()
+        if not self._machine_id:
+            if self._machine_id_candidates:
+                self._machine_id = self._machine_id_candidates[0]
+            else:
+                self._machine_id = self._generate_fast_hwid()
+            _save_persisted_machine_id(self._machine_id)
         self._msg_callback = None
         self._cmd_callback = None
         self._log_callback = None
         self._user_seq_id = 0
+        self.refresh_machine_id_candidates_async()
 
     def set_server_message_callback(self, callback):
         """设置接收服务端控制消息的回调函数 (config: dict) -> None"""
@@ -239,67 +312,96 @@ class TelemetryManager:
         except Exception:
             return ""
 
+    def _parse_hardware_lines(self, output: str, headers: set[str]) -> list[str]:
+        values = []
+        for line in str(output or "").splitlines():
+            value = line.strip()
+            if not value:
+                continue
+            compact = value.replace(" ", "").replace("\t", "")
+            if compact in headers or set(compact) <= {"-"}:
+                continue
+            values.append(value)
+        return _dedupe_text_values(values)
+
     def _get_cpu_id(self) -> str:
         """跨平台获取 CPU 识别特征。"""
+        candidates = self._get_cpu_id_candidates()
+        return candidates[0] if candidates else ""
+
+    def _get_cpu_id_candidates(self) -> list[str]:
+        """跨平台获取 CPU 识别特征候选。"""
         sys_type = platform.system()
         if sys_type == "Windows":
+            values = []
+            output = self._run_command(
+                'powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty ProcessorId)"'
+            )
+            values.extend(self._parse_hardware_lines(output, {"ProcessorId"}))
             output = self._run_command("wmic cpu get processorid")
-            lines = output.splitlines()
-            filtered = [l.strip() for l in lines if l.strip() and "ProcessorId" not in l]
-            return filtered[0] if filtered else ""
+            values.extend(self._parse_hardware_lines(output, {"ProcessorId"}))
+            return _dedupe_text_values(values)
         elif sys_type == "Linux":
             # Linux CPU 序列号通常需要权限或特定架构支持，此处作为辅助
             try:
                 with open("/proc/cpuinfo", "r") as f:
                     for line in f:
                         if "serial" in line.lower() and ":" in line:
-                            return line.split(":")[1].strip()
+                            value = line.split(":")[1].strip()
+                            return [value] if value else []
             except Exception:
                 pass
-        return ""
+        return []
 
     def _get_disk_serial(self) -> str:
         """ 获取磁盘或系统唯一 ID """
+        candidates = self._get_disk_serial_candidates()
+        return candidates[0] if candidates else ""
+
+    def _get_disk_serial_candidates(self) -> list[str]:
+        """获取磁盘或系统唯一 ID 候选。"""
         sys_type = platform.system()
         if sys_type == "Windows":
+            values = []
+            output = self._run_command(
+                'powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance Win32_DiskDrive | Where-Object { $_.SerialNumber } | Select-Object -First 3 -ExpandProperty SerialNumber)"'
+            )
+            values.extend(self._parse_hardware_lines(output, {"SerialNumber"}))
             output = self._run_command("wmic diskdrive get serialnumber")
-            lines = output.splitlines()
-            filtered = [l.strip() for l in lines if l.strip() and "SerialNumber" not in l]
-            return filtered[0] if filtered else ""
+            values.extend(self._parse_hardware_lines(output, {"SerialNumber"}))
+            return _dedupe_text_values(values)[:4]
         elif sys_type == "Linux":
             # Linux 下优先使用系统级的 machine-id
             for p in ["/etc/machine-id", "/var/lib/dbus/machine-id"]:
                 if os.path.exists(p):
                     try:
                         with open(p, "r") as f:
-                            return f.read().strip()
+                            value = f.read().strip()
+                            return [value] if value else []
                     except Exception:
                         pass
             # 备选：使用 lsblk 获取根磁盘序列号
             serial = self._run_command("lsblk -d -no serial")
             if serial:
-                return serial.splitlines()[0].strip()
-        return ""
+                return self._parse_hardware_lines(serial, set())[:4]
+        return []
 
     def _get_mac_address(self) -> str:
         """获取网卡 MAC 地址的哈希特征。"""
+        candidates = self._get_mac_address_candidates()
+        return candidates[0] if candidates else ""
+
+    def _get_mac_address_candidates(self) -> list[str]:
+        """获取网卡 MAC 地址候选。"""
         try:
             node = uuid.getnode()
-            return str(uuid.UUID(int=node).hex[-12:])
+            value = str(uuid.UUID(int=node).hex[-12:])
+            return [value] if value else []
         except Exception:
-            return ""
+            return []
 
-    def _generate_hwid(self) -> str:
-        """
-        生成脱敏后的跨平台唯一机器码。
-        通过组合 CPU ID、磁盘/系统 ID、MAC 及主机名进行加盐哈希。
-        """
-        cpu_id = self._get_cpu_id()
-        disk_id = self._get_disk_serial()
-        mac_addr = self._get_mac_address()
-        hostname = platform.node()
-
-        # 读取注入的盐值
+    def _resolve_hwid_salts(self) -> list[str]:
+        salts = []
         salt = os.environ.get("TELEMETRY_SALT")
         if not salt:
             try:
@@ -307,15 +409,98 @@ class TelemetryManager:
                 salt = getattr(app_secrets, "TELEMETRY_SALT", None)
             except ImportError:
                 salt = None
+        for item in (salt, "DEFAULT_PUBLIC_SALT_2026_CROSS"):
+            normalized = str(item or "").strip()
+            if normalized and normalized not in salts:
+                salts.append(normalized)
+        return salts
 
-        if not salt:
-            salt = "DEFAULT_PUBLIC_SALT_2026_CROSS"
+    def _generate_hwid_candidates(self) -> list[str]:
+        """
+        生成当前版本可复现的机器码候选集合，用于跨版本 UID 归并。
+        """
+        cpu_ids = self._get_cpu_id_candidates() or [""]
+        disk_ids = self._get_disk_serial_candidates() or [""]
+        mac_addrs = self._get_mac_address_candidates() or [""]
+        hostname = str(platform.node() or "").strip()
+        hostnames = [""]
+        if hostname:
+            hostnames.append(hostname)
 
-        raw_hwid = f"{cpu_id}|{disk_id}|{mac_addr}|{hostname}|{salt}"
-        return hashlib.sha256(raw_hwid.encode('utf-8')).hexdigest()
+        candidates = []
+        for salt, cpu_id, disk_id, mac_addr, host in product(
+            self._resolve_hwid_salts(),
+            cpu_ids,
+            disk_ids,
+            mac_addrs,
+            hostnames,
+        ):
+            raw_hwid = f"{cpu_id}|{disk_id}|{mac_addr}|{host}|{salt}"
+            candidates.append(hashlib.sha256(raw_hwid.encode('utf-8')).hexdigest())
+        return _dedupe_machine_ids(candidates)[:_MAX_MACHINE_ID_CANDIDATES]
+
+    def _generate_fast_hwid_candidates(self) -> list[str]:
+        """生成无需外部命令的轻量候选，避免初始化阻塞 UI。"""
+        mac_addrs = self._get_mac_address_candidates() or [""]
+        hostname = str(platform.node() or "").strip()
+        hostnames = [""]
+        if hostname:
+            hostnames.append(hostname)
+
+        candidates = []
+        for salt, mac_addr, host in product(self._resolve_hwid_salts(), mac_addrs, hostnames):
+            raw_hwid = f"||{mac_addr}|{host}|{salt}"
+            candidates.append(hashlib.sha256(raw_hwid.encode('utf-8')).hexdigest())
+        return _dedupe_machine_ids(candidates)[:_MAX_MACHINE_ID_CANDIDATES]
+
+    def _generate_fast_hwid(self) -> str:
+        candidates = self._generate_fast_hwid_candidates()
+        return candidates[0] if candidates else ""
+
+    def _generate_hwid(self) -> str:
+        """
+        生成脱敏后的跨平台唯一机器码。
+        通过组合 CPU ID、磁盘/系统 ID、MAC 及主机名进行加盐哈希。
+        """
+        candidates = self._generate_hwid_candidates()
+        return candidates[0] if candidates else ""
 
     def get_machine_id(self) -> str:
         return self._machine_id
+
+    def _get_machine_id_candidates(self) -> list[str]:
+        with self._candidate_lock:
+            return _dedupe_machine_ids([self._machine_id] + list(self._machine_id_candidates))[:_MAX_MACHINE_ID_CANDIDATES]
+
+    def _wait_for_machine_id_candidates(self, timeout: float = 5.0) -> None:
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while time.monotonic() < deadline:
+            with self._candidate_lock:
+                if self._full_candidates_ready or not self._candidate_refresh_started:
+                    return
+            time.sleep(0.05)
+
+    def refresh_machine_id_candidates_async(self) -> None:
+        with self._candidate_lock:
+            if self._candidate_refresh_started or self._full_candidates_ready:
+                return
+            self._candidate_refresh_started = True
+
+        def _worker():
+            try:
+                candidates = self._generate_hwid_candidates()
+                with self._candidate_lock:
+                    merged = _dedupe_machine_ids([self._machine_id] + list(self._machine_id_candidates) + candidates)[:_MAX_MACHINE_ID_CANDIDATES]
+                    self._machine_id_candidates = merged
+                    self._full_candidates_ready = True
+            except Exception:
+                with self._candidate_lock:
+                    self._full_candidates_ready = True
+            finally:
+                with self._candidate_lock:
+                    self._candidate_refresh_started = False
+
+        threading.Thread(target=_worker, daemon=True, name="TelemetryIDCandidates").start()
 
     def get_user_seq_id(self) -> int:
         return self._user_seq_id
@@ -329,6 +514,7 @@ class TelemetryManager:
 
         def _do_report():
             try:
+                self._wait_for_machine_id_candidates()
                 screen_res = "unknown"
                 try:
                     import ctypes
@@ -355,6 +541,7 @@ class TelemetryManager:
 
                 payload = {
                     "machine_id": self._machine_id,
+                    "machine_id_candidates": self._get_machine_id_candidates(),
                     "version": self.app_version,
                     "os": platform.system(),
                     "os_release": platform.release(),
@@ -392,6 +579,13 @@ class TelemetryManager:
                         ).strip()
                         if issued_token:
                             set_client_device_token(issued_token)
+                        canonical_machine_id = str(data.get("canonical_machine_id", "") or "").strip()
+                        if (
+                            _is_valid_machine_id(canonical_machine_id)
+                            and canonical_machine_id.lower() != self._machine_id.lower()
+                        ):
+                            self._machine_id = canonical_machine_id.lower()
+                            _save_persisted_machine_id(self._machine_id)
                         sys_config = data.get("sys_config")
                         if sys_config:
                             # 读取服务端下发的心跳间隔

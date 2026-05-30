@@ -88,7 +88,7 @@ func initDB() {
 		log.Printf("警告: 设置 SQLite busy_timeout 失败: %v", err)
 	}
 	if err := db.AutoMigrate(&TelemetryRecord{}, &ContentConfig{}, &NoticeItem{}, &FeedbackRecord{},
-		&ClientDeviceToken{}, &AIUsageRecord{}, &AIUserBan{}, &AIUserLimit{}, &UserTag{}, &AdClickEvent{},
+		&ClientDeviceToken{}, &MachineIDAlias{}, &AIUsageRecord{}, &AIUserBan{}, &AIUserLimit{}, &UserTag{}, &AdClickEvent{},
 		&RedeemCode{}, &RedeemRecord{}, &NoticeReaction{},
 		&NoticeComment{}, &NoticeCommentLike{}, &NoticeCommentBan{}, &CommentReport{},
 		&UserProfile{}, &NicknameRequest{}, &AvatarRequest{}, &AuditLog{},

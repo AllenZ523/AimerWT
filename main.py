@@ -82,7 +82,7 @@ from wt.wt_text import (
 )
 
 APP_VERSION = "3.0.0"
-AGREEMENT_VERSION = "2026-01-10"
+AGREEMENT_VERSION = "2026-05-29-v3-beta"
 DEFAULT_PENDING_DIR_NAME = "待解压区"
 DEFAULT_RESOURCE_ROOT_DIR_NAME = "AimerWT资源库"
 DEFAULT_VOICE_LIBRARY_DIR_NAME = "WT语音包库"
@@ -6412,7 +6412,7 @@ def main() -> int:
     # 创建窗口实例（x/y 指定启动位置）
     try:
         window = webview.create_window(
-            title="Aimer WT v3 内测",
+            title="Aimer WT V3 Beta",
             url=str(index_html),
             js_api=api,
             width=window_width,

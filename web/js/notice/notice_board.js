@@ -93,6 +93,11 @@
             var nid = dot.getAttribute('data-unread-nid');
             if (nid && readIds.indexOf(nid) >= 0) {
                 dot.classList.add('read');
+                if (typeof dot.remove === 'function') {
+                    dot.remove();
+                } else if (dot.parentNode) {
+                    dot.parentNode.removeChild(dot);
+                }
             }
         });
     }

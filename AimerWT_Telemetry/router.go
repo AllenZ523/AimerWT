@@ -34,6 +34,102 @@ func matchScope(scope string, record TelemetryRecord) bool {
 	return scope == record.Version
 }
 
+func normalizeMachineIDCandidate(machineID string) string {
+	normalized := strings.ToLower(strings.TrimSpace(machineID))
+	if len(normalized) != 64 {
+		return ""
+	}
+	for _, ch := range normalized {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+			return ""
+		}
+	}
+	return normalized
+}
+
+func knownMachineIDExists(machineID string) bool {
+	normalized := normalizeMachineIDCandidate(machineID)
+	if normalized == "" {
+		return false
+	}
+
+	var count int64
+	if err := db.Model(&TelemetryRecord{}).Where("machine_id = ?", normalized).Count(&count).Error; err == nil && count > 0 {
+		return true
+	}
+	if err := db.Model(&UserUIDMapping{}).Where("machine_id = ?", normalized).Count(&count).Error; err == nil && count > 0 {
+		return true
+	}
+	if err := db.Model(&ClientDeviceToken{}).Where("machine_id = ?", normalized).Count(&count).Error; err == nil && count > 0 {
+		return true
+	}
+	return false
+}
+
+func resolveMachineIDAlias(machineID string) string {
+	normalized := normalizeMachineIDCandidate(machineID)
+	if normalized == "" {
+		return ""
+	}
+
+	var alias MachineIDAlias
+	if err := db.Where("alias_machine_id = ?", normalized).First(&alias).Error; err != nil {
+		return ""
+	}
+	canonical := normalizeMachineIDCandidate(alias.CanonicalMachineID)
+	if canonical == "" || canonical == normalized {
+		return ""
+	}
+	if !knownMachineIDExists(canonical) {
+		return ""
+	}
+	return canonical
+}
+
+func resolveKnownMachineIDCandidate(currentMachineID string, candidates []string) string {
+	current := normalizeMachineIDCandidate(currentMachineID)
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		normalized := normalizeMachineIDCandidate(candidate)
+		if normalized == "" || normalized == current || seen[normalized] {
+			continue
+		}
+		seen[normalized] = true
+		if canonical := resolveMachineIDAlias(normalized); canonical != "" && canonical != current {
+			return canonical
+		}
+		if knownMachineIDExists(normalized) {
+			return normalized
+		}
+	}
+	return ""
+}
+
+func recordMachineIDAliasesTx(tx *gorm.DB, canonicalMachineID string, candidates []string) error {
+	canonical := normalizeMachineIDCandidate(canonicalMachineID)
+	if canonical == "" {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		alias := normalizeMachineIDCandidate(candidate)
+		if alias == "" || alias == canonical || seen[alias] {
+			continue
+		}
+		seen[alias] = true
+		if err := tx.Exec(`
+			INSERT INTO machine_id_aliases (alias_machine_id, canonical_machine_id, first_seen_at, last_seen_at)
+			VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			ON CONFLICT(alias_machine_id) DO UPDATE SET last_seen_at = CURRENT_TIMESTAMP
+			WHERE canonical_machine_id = excluded.canonical_machine_id
+		`, alias, canonical).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func parseBannerItems(raw any) ([]BannerItem, error) {
 	if raw == nil {
 		return nil, nil
@@ -1784,6 +1880,32 @@ func initRouter(r *gin.Engine) {
 		}
 
 		record.MachineID = strings.TrimSpace(record.MachineID)
+		reportedMachineID := record.MachineID
+		canonicalMachineID := ""
+		if value, ok := c.Get("_canonicalMachineID"); ok {
+			candidate := strings.TrimSpace(fmt.Sprint(value))
+			if candidate != "" {
+				canonicalMachineID = candidate
+				record.MachineID = candidate
+			}
+		}
+		if canonicalMachineID == "" {
+			if _, tokenValid := c.Get("_clientDeviceTokenValid"); !tokenValid {
+				if candidate := resolveMachineIDAlias(record.MachineID); candidate != "" {
+					canonicalMachineID = candidate
+					record.MachineID = candidate
+					if strings.TrimSpace(c.GetHeader(clientDeviceTokenHeader)) == "" {
+						c.Set("_deviceTokenRenew", true)
+					}
+				} else if candidate := resolveKnownMachineIDCandidate(record.MachineID, record.MachineIDCandidates); candidate != "" {
+					canonicalMachineID = candidate
+					record.MachineID = candidate
+					if strings.TrimSpace(c.GetHeader(clientDeviceTokenHeader)) == "" {
+						c.Set("_deviceTokenRenew", true)
+					}
+				}
+			}
+		}
 		record.LastSeenAt = time.Now()
 
 		var dbRecord TelemetryRecord
@@ -1829,6 +1951,10 @@ func initRouter(r *gin.Engine) {
 			if err != nil {
 				return err
 			}
+			aliasCandidates := append([]string{reportedMachineID}, record.MachineIDCandidates...)
+			if err := recordMachineIDAliasesTx(tx, record.MachineID, aliasCandidates); err != nil {
+				return err
+			}
 			userSeqID = seqID
 			return nil
 		})
@@ -1868,6 +1994,9 @@ func initRouter(r *gin.Engine) {
 			"sys_config":   clientConfig,
 			"user_command": pendingCmd,
 			"user_seq_id":  userSeqID,
+		}
+		if canonicalMachineID != "" {
+			response["canonical_machine_id"] = canonicalMachineID
 		}
 		// 统一 token 签发：首次引导或 token 失效重签均走此路径，
 		// issueClientDeviceToken 内部使用 Upsert 保证幂等。

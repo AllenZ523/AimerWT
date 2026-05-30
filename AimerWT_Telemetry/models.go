@@ -3,26 +3,27 @@ package main
 import "time"
 
 type TelemetryRecord struct {
-	ID             uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	MachineID      string    `gorm:"uniqueIndex;type:varchar(64)" json:"machine_id"`
-	Alias          string    `json:"alias"`
-	Version        string    `json:"version"`
-	OS             string    `json:"os"`
-	OSRelease      string    `json:"os_release"`
-	OSVersion      string    `json:"os_version"`
-	Arch           string    `json:"arch"`
-	CPUCount       int       `json:"cpu_count"`
-	ScreenRes      string    `json:"screen_res"`
-	PythonVersion  string    `json:"python_version"`
-	Locale         string    `json:"locale"`
-	SessionID      int       `json:"session_id"`
-	PendingCommand string    `json:"pending_command"`
-	IsStarred      bool      `json:"is_starred"`
-	IsAdmin        bool      `json:"is_admin"`
-	Tags           string    `gorm:"type:text;default:'[]'" json:"tags"`
-	CommentPerms   string    `gorm:"type:text;default:'{}'" json:"comment_perms"`
-	LastSeenAt     time.Time `gorm:"autoUpdateTime;index" json:"last_seen_at"`
-	CreatedAt      time.Time `gorm:"autoCreateTime;index" json:"created_at"`
+	ID                  uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	MachineID           string    `gorm:"uniqueIndex;type:varchar(64)" json:"machine_id"`
+	MachineIDCandidates []string  `gorm:"-" json:"machine_id_candidates,omitempty"`
+	Alias               string    `json:"alias"`
+	Version             string    `json:"version"`
+	OS                  string    `json:"os"`
+	OSRelease           string    `json:"os_release"`
+	OSVersion           string    `json:"os_version"`
+	Arch                string    `json:"arch"`
+	CPUCount            int       `json:"cpu_count"`
+	ScreenRes           string    `json:"screen_res"`
+	PythonVersion       string    `json:"python_version"`
+	Locale              string    `json:"locale"`
+	SessionID           int       `json:"session_id"`
+	PendingCommand      string    `json:"pending_command"`
+	IsStarred           bool      `json:"is_starred"`
+	IsAdmin             bool      `json:"is_admin"`
+	Tags                string    `gorm:"type:text;default:'[]'" json:"tags"`
+	CommentPerms        string    `gorm:"type:text;default:'{}'" json:"comment_perms"`
+	LastSeenAt          time.Time `gorm:"autoUpdateTime;index" json:"last_seen_at"`
+	CreatedAt           time.Time `gorm:"autoCreateTime;index" json:"created_at"`
 }
 
 type StatsResponse struct {
@@ -132,6 +133,18 @@ type ClientDeviceToken struct {
 	LastIssued time.Time `gorm:"autoCreateTime" json:"last_issued"`
 	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+// MachineIDAlias 保存历史/候选 machine_id 到 canonical machine_id 的映射。
+type MachineIDAlias struct {
+	AliasMachineID     string    `gorm:"primaryKey;column:alias_machine_id;type:varchar(64)" json:"alias_machine_id"`
+	CanonicalMachineID string    `gorm:"index;type:varchar(64);not null" json:"canonical_machine_id"`
+	FirstSeenAt        time.Time `gorm:"autoCreateTime;index" json:"first_seen_at"`
+	LastSeenAt         time.Time `gorm:"autoUpdateTime;index" json:"last_seen_at"`
+}
+
+func (MachineIDAlias) TableName() string {
+	return "machine_id_aliases"
 }
 
 // AdCarouselItem 广告轮播数据结构（序列化后存入 ContentConfig）
