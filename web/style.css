@@ -1748,6 +1748,18 @@ i[class^="ri-"] {
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
 }
 
+/* 公告栏底部 UID 可交互标签 */
+.uid-label {
+    cursor: pointer;
+    transition: color 0.25s ease;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+.uid-label:hover {
+    color: var(--primary);
+}
+
 /* 日志 (现代化优化版) */
 .log-card {
     grid-row: 2;

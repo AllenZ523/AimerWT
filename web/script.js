@@ -2924,6 +2924,9 @@ const app = {
             if (window.NoticeBoardModule && typeof window.NoticeBoardModule.updateServerStatusFooter === 'function') {
                 window.NoticeBoardModule.updateServerStatusFooter(this.telemetryConnected, this.userSeqId);
             }
+            if (connected && this.userSeqId && window.UidPopupModule && typeof window.UidPopupModule.checkUidFirstShow === 'function') {
+                window.UidPopupModule.checkUidFirstShow(this.userSeqId);
+            }
         } catch (_e) {
         }
     },

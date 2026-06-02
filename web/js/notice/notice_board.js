@@ -217,9 +217,10 @@
         }
 
         const connected = !!(app && app.telemetryConnected);
-        const seqId = (app && app.userSeqId) ? app.userSeqId : 0;
-        const footerText = connected
-            ? (seqId ? `已连接服务器 · 用户UID: ${seqId}` : '已连接服务器')
+        const seqId = (app && app.userSeqId) ? parseInt(app.userSeqId, 10) || 0 : 0;
+        const uidSpan = seqId ? ` · <span class="uid-label" data-uid="${seqId}" title="点击查看 UID 详情">用户UID: ${seqId}</span>` : '';
+        const footerHtml = connected
+            ? `已连接服务器${uidSpan}`
             : '未连接到服务器';
         const dotClass = connected ? 'connected' : 'disconnected';
 
@@ -237,7 +238,7 @@
                 </div>
                 <div class="notice-footer" id="notice-server-status" data-connected="${connected ? '1' : '0'}">
                     <span class="notice-footer-dot ${dotClass}" aria-hidden="true"></span>
-                    <span class="notice-footer-text">${footerText}</span>
+                    <span class="notice-footer-text">${footerHtml}</span>
                 </div>
             `;
             bindEvents(app);
@@ -309,7 +310,7 @@
             </div>
             <div class="notice-footer" id="notice-server-status" data-connected="${connected ? '1' : '0'}">
                 <span class="notice-footer-dot ${dotClass}" aria-hidden="true"></span>
-                <span class="notice-footer-text">${footerText}</span>
+                <span class="notice-footer-text">${footerHtml}</span>
             </div>
         `;
 
@@ -337,8 +338,12 @@
             dot.classList.toggle('disconnected', !isConnected);
         }
         if (text) {
-            text.textContent = isConnected
-                ? (seqId ? `已连接服务器 · 用户UID: ${seqId}` : '已连接服务器')
+            const safeId = parseInt(seqId, 10) || 0;
+            const uidSpan = (isConnected && safeId)
+                ? ` · <span class="uid-label" data-uid="${safeId}" title="点击查看 UID 详情">用户UID: ${safeId}</span>`
+                : '';
+            text.innerHTML = isConnected
+                ? `已连接服务器${uidSpan}`
                 : '未连接到服务器';
         }
     }
