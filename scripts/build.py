@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import os
 import shutil
 import hashlib
@@ -23,6 +23,16 @@ REQUIRED_BUILD_ENV_VARS = (
     "REPORT_URL",
     "TELEMETRY_CLIENT_SECRET",
     "TELEMETRY_SALT",
+)
+
+REQUIRED_UNTRACKED_THEME_FILES = (
+    "bi_an.json",
+    "beiku.json",
+    "lianying.json",
+    "chifeng.json",
+    "wuye_fuyin.json",
+    "zqrx_mifuyu.json",
+    "supporter.json",
 )
 
 
@@ -95,6 +105,25 @@ def copy_tracked_web_files(target_dir: Path) -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         copied += 1
+    return copied
+
+
+def _copy_untracked_build_assets(web_pack_dir: Path) -> int:
+    """复制被 .gitignore 排除但分发版必需的 web 文件。"""
+    themes_src = PROJECT_ROOT / "web" / "themes"
+    themes_dst = web_pack_dir / "themes"
+    themes_dst.mkdir(parents=True, exist_ok=True)
+
+    copied = 0
+    for filename in REQUIRED_UNTRACKED_THEME_FILES:
+        source = themes_src / filename
+        if not source.is_file():
+            log.warning(f"   - 分发版隐藏主题缺失: {filename}")
+            continue
+        dst = themes_dst / filename
+        if not dst.exists():
+            shutil.copy2(source, dst)
+            copied += 1
     return copied
 
 
@@ -194,6 +223,11 @@ def build_exe():
         web_pack_dir = Path(tmp_dir) / "web"
         copied_web_files = copy_tracked_web_files(web_pack_dir)
         log.info(f"   - 已准备 web 打包文件: {copied_web_files} 个")
+
+        # 补充复制被 .gitignore 排除但分发版必需的文件
+        extra_count = _copy_untracked_build_assets(web_pack_dir)
+        if extra_count:
+            log.info(f"   - 已补充非 Git 跟踪文件: {extra_count} 个")
         version_file = Path(tmp_dir) / "version_info.txt"
         write_version_info(version_file)
 
@@ -218,6 +252,8 @@ def build_exe():
             "--hidden-import", "certifi",
             "--hidden-import", "charset_normalizer",
             "--hidden-import", "bottle",
+            "--hidden-import", "services.theme_unlock",
+            "--hidden-import", "services.theme_unlock.service",
             "--collect-all", "webview",
             "--collect-all", "pystray",
             "main.py"

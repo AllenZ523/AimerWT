@@ -1348,6 +1348,57 @@ class AppApi:
             self._latest_server_config = copy.deepcopy(config)
         self._apply_server_message(config)
 
+    def _command_signature(self, cmd) -> str:
+        try:
+            return json.dumps(cmd, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        except Exception:
+            return ""
+
+    def _remember_direct_redeem_command(self, cmd) -> None:
+        signature = self._command_signature(cmd)
+        if not signature:
+            return
+        self._last_direct_redeem_signature = signature
+        self._last_direct_redeem_at = time.monotonic()
+
+    def _is_recent_direct_redeem_command(self, cmd) -> bool:
+        signature = self._command_signature(cmd)
+        if not signature:
+            return False
+        if signature != getattr(self, "_last_direct_redeem_signature", ""):
+            return False
+        last_at = float(getattr(self, "_last_direct_redeem_at", 0) or 0)
+        return time.monotonic() - last_at <= 300
+
+    def _apply_redeem_result_side_effects(self, cmd) -> dict:
+        if not isinstance(cmd, dict):
+            return {"success": True}
+        if cmd.get("type") != "redeem_result" or not cmd.get("success", False):
+            return {"success": True}
+        if not cmd.get("theme_unlocked"):
+            return {"success": True}
+
+        theme_file = str(cmd.get("theme_file") or "").strip()
+        remote_theme = cmd.get("remote_theme")
+        if isinstance(remote_theme, dict):
+            save_result = self._save_redeemed_remote_theme(remote_theme)
+            if save_result.get("success"):
+                if not theme_file:
+                    cmd["theme_file"] = save_result.get("filename", "")
+                self._logger.info(f"[CMD] 远程主题已保存: {cmd.get('theme_file', '')}")
+                return {"success": True}
+            self._logger.error(f"[CMD] 远程主题保存失败: {save_result.get('message')}")
+            return {
+                "success": False,
+                "message": save_result.get("message") or "远程主题保存失败",
+            }
+
+        if theme_file and self._theme_unlock and not _is_remote_theme_filename(theme_file):
+            result = self._theme_unlock.unlock_theme_by_name(theme_file)
+            if not result.get("success"):
+                return result
+        return {"success": True}
+
     def on_user_command(self, cmd_json: str):
         """处理针对当前用户的特定指令驱动"""
         if not self._window:
@@ -1358,6 +1409,8 @@ class AppApi:
             cmd = json.loads(cmd_json)
             cmd_type = cmd.get("type")
             msg = cmd.get("message", "")
+            if cmd_type == "redeem_result" and self._is_recent_direct_redeem_command(cmd):
+                return
 
             # 序列化辅助
             def safe_js_call(func_name, *args):
@@ -1384,18 +1437,13 @@ class AppApi:
                 message = cmd.get("message", "")
                 if success:
                     self._logger.info(f"[CMD] 兑换成功: {message}")
-                    # 如果包含主题解锁，刷新主题列表
+                    side_effect_result = self._apply_redeem_result_side_effects(cmd)
+                    if not side_effect_result.get("success"):
+                        self._window.evaluate_js(
+                            safe_js_call("showAlert", title, side_effect_result.get("message", "兑换处理失败"), "error")
+                        )
+                        return
                     if cmd.get("theme_unlocked"):
-                        theme_file = cmd.get("theme_file", "")
-                        remote_theme = cmd.get("remote_theme")
-                        if isinstance(remote_theme, dict):
-                            save_result = self._save_redeemed_remote_theme(remote_theme)
-                            if save_result.get("success"):
-                                self._logger.info(f"[CMD] 远程主题已保存: {theme_file}")
-                            else:
-                                self._logger.error(f"[CMD] 远程主题保存失败: {save_result.get('message')}")
-                        elif theme_file and self._theme_unlock and not _is_remote_theme_filename(theme_file):
-                            self._theme_unlock.unlock_theme_by_name(theme_file)
                         self._window.evaluate_js("if(window.app && app.loadThemeList) app.loadThemeList()")
                     self._window.evaluate_js(safe_js_call("showAlert", title, message, "success"))
                 else:
@@ -6410,9 +6458,21 @@ class AppApi:
             if resp.status_code == 200 and data.get("status") == "success":
                 # 处理服务端返回的指令
                 cmd = data.get("command")
-                if cmd:
+                if isinstance(cmd, dict) and cmd.get("type") == "redeem_result":
+                    side_effect_result = self._apply_redeem_result_side_effects(cmd)
+                    if not side_effect_result.get("success"):
+                        return {
+                            "success": False,
+                            "message": side_effect_result.get("message", "兑换处理失败"),
+                        }
+                    self._remember_direct_redeem_command(cmd)
+                elif cmd:
                     self.on_user_command(json.dumps(cmd) if isinstance(cmd, dict) else str(cmd))
-                return {"success": True, "message": data.get("message", "兑换成功！")}
+                return {
+                    "success": True,
+                    "message": data.get("message", "兑换成功！"),
+                    "command": cmd if isinstance(cmd, dict) else None,
+                }
             else:
                 return {"success": False, "message": data.get("error", "兑换失败")}
         except Exception as e:

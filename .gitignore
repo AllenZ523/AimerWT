@@ -79,7 +79,9 @@ web/themes/chifeng.json
 
 # Supporter-only theme assets / local unlock module (do not upload)
 web/assets/aifadian.png
-web/redeem/
+web/redeem/*
+!web/redeem/redeem_ui.js
+!web/redeem/redeem_popup.css
 services/theme_unlock/
 
 # Temp workdir

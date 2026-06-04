@@ -301,9 +301,23 @@
         return state.guideStateCache ? { ...state.guideStateCache } : getLocalGuideState();
     }
 
+    async function getBackendGuideState() {
+        if (!window.pywebview?.api?.get_guide_state) return null;
+        try {
+            const res = await pywebview.api.get_guide_state();
+            if (res && typeof res === "object") return normalizeGuideState(res);
+        } catch (_e) {
+        }
+        return null;
+    }
+
     function persistGuideStateToBackend(guideState) {
-        // localStorage 作为数据源
-        void guideState;
+        if (!window.pywebview?.api?.save_guide_state) return;
+        const payload = normalizeGuideState(guideState);
+        try {
+            void pywebview.api.save_guide_state(payload);
+        } catch (_e) {
+        }
     }
 
     async function ensureGuideStateLoaded() {
@@ -312,7 +326,11 @@
 
         state.guideStateLoadPromise = (async () => {
             const local = getLocalGuideState();
-            const merged = { ...local };
+            const backend = await getBackendGuideState();
+            const merged = normalizeGuideState({
+                completed: Boolean(local.completed || backend?.completed),
+                firstOpenHandled: Boolean(local.firstOpenHandled || backend?.firstOpenHandled)
+            });
             state.guideStateCache = merged;
             setLocalGuideState(merged);
             persistGuideStateToBackend(merged);

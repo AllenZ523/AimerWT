@@ -1,0 +1,146 @@
+/* 兑换码结果弹窗样式
+ * 修复白边、添加入场动画、按钮hover效果 */
+
+/* 遮罩层专属覆盖：去除 modal-content 白边 */
+#modal-redeem-result .modal-content {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-width: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+}
+
+/* 弹窗卡片入场动画 */
+@keyframes redeem-popup-entrance {
+    0% {
+        opacity: 0;
+        transform: scale(0.85) translateY(18px);
+    }
+    60% {
+        opacity: 1;
+        transform: scale(1.03) translateY(-2px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* 默认隐藏弹窗卡片，避免 .show 添加瞬间闪烁 */
+#redeem-result-host > div {
+    opacity: 0;
+    transform: scale(0.85) translateY(18px);
+}
+
+#modal-redeem-result.show #redeem-result-host > div {
+    animation: redeem-popup-entrance 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 关闭按钮入场 */
+@keyframes redeem-close-entrance {
+    0% { opacity: 0; transform: scale(0.5) rotate(-90deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+#modal-redeem-result.show .redeem-popup-close-btn {
+    animation: redeem-close-entrance 0.35s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 关闭按钮样式 */
+.redeem-popup-close-btn {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    z-index: 2;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.redeem-popup-close-btn:hover {
+    background: rgba(15, 23, 42, 0.92);
+    transform: scale(1.12) rotate(90deg);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+}
+
+.redeem-popup-close-btn:active {
+    transform: scale(0.95);
+}
+
+/* 弹窗内按钮通用 hover/active 交互 */
+.redeem-popup-action-btn {
+    transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.redeem-popup-action-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.28s ease;
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+.redeem-popup-action-btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.12);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22) !important;
+}
+
+.redeem-popup-action-btn:hover::after {
+    opacity: 1;
+}
+
+.redeem-popup-action-btn:active {
+    transform: translateY(0) scale(0.97);
+    filter: brightness(0.95);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 图标微动效 */
+@keyframes redeem-icon-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+#modal-redeem-result.show .redeem-popup-icon {
+    animation: redeem-icon-float 2.5s ease-in-out infinite 0.5s;
+}
+
+/* 奖励列表逐行渐入 */
+@keyframes redeem-reward-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+#modal-redeem-result.show .redeem-reward-item {
+    animation: redeem-reward-fade-in 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+#modal-redeem-result.show .redeem-reward-item:nth-child(1) { animation-delay: 0.20s; }
+#modal-redeem-result.show .redeem-reward-item:nth-child(2) { animation-delay: 0.36s; }
+#modal-redeem-result.show .redeem-reward-item:nth-child(3) { animation-delay: 0.52s; }
+#modal-redeem-result.show .redeem-reward-item:nth-child(4) { animation-delay: 0.68s; }
+#modal-redeem-result.show .redeem-reward-item:nth-child(5) { animation-delay: 0.84s; }
