@@ -71,9 +71,14 @@
 
             <!-- 基础参数 -->
             <div class="redeem-form-grid" style="margin-top: 20px;">
+                <div class="form-group" id="redeemCustomCodeGroup">
+                    <label>自定义兑换码（可选）</label>
+                    <input type="text" class="input" style="width: 100%; text-transform: uppercase; font-family: monospace; letter-spacing: 1px;" id="redeemCustomCode" placeholder="如 VIP-2026 或留空自动生成" maxlength="32" oninput="redeemModule.onCustomCodeInput()">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">3-32 个字符，仅字母、数字和连字符，填写后数量固定为 1</div>
+                </div>
                 <div class="form-group">
                     <label>生成数量</label>
-                    <input type="number" class="input" style="width: 100%;" id="redeemGenCount" value="1" min="1" max="100">
+                    <input type="number" class="input" style="width: 100%;" id="redeemGenCount" value="1" min="1" max="100" oninput="redeemModule.onCountInput()">
                 </div>
                 <div class="form-group">
                     <label>单码最大使用次数</label>

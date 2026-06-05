@@ -123,6 +123,15 @@ const redeemModule = {
             .replace(/'/g, '&#39;');
     },
 
+    _parseNonNegativeInt(value, fallback = 0) {
+        const parsed = parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+    },
+
+    _readNonNegativeInt(id, fallback = 0) {
+        return this._parseNonNegativeInt(document.getElementById(id)?.value, fallback);
+    },
+
     _getFallbackThemeOptions() {
         return Object.entries(this._themeDisplayNames).map(([filename, name], index) => ({
             source: 'local',
@@ -563,7 +572,7 @@ const redeemModule = {
             document.getElementById('redeemPayloadBonus').value = savedDefaults.bonus || 0;
             document.getElementById('redeemPayloadDailyBonus').value = savedDefaults.daily_limit_bonus || 0;
             document.getElementById('redeemPayloadTag').value = savedDefaults.tag || '';
-            document.getElementById('redeemGenMaxUses').value = savedDefaults.max_uses || 1;
+            document.getElementById('redeemGenMaxUses').value = this._parseNonNegativeInt(savedDefaults.max_uses, 1);
             // 弹窗自定义字段
             document.getElementById('redeemPopupTitle').value = savedDefaults.popup_title || '';
             document.getElementById('redeemPopupButton').value = savedDefaults.popup_button || '';
@@ -596,7 +605,7 @@ const redeemModule = {
                     document.getElementById('redeemPayloadDailyBonus').value = p.daily_limit_bonus || 0;
                     document.getElementById('redeemPayloadTag').value = p.tag || '';
                 } catch {}
-                document.getElementById('redeemGenMaxUses').value = preset.max_uses || 1;
+                document.getElementById('redeemGenMaxUses').value = this._parseNonNegativeInt(preset.max_uses, 1);
             }
             // 清空弹窗自定义字段
             document.getElementById('redeemPopupTitle').value = '';
@@ -805,7 +814,35 @@ const redeemModule = {
         if (streamerRow) streamerRow.style.display = 'none';
         const resultDiv = document.getElementById('redeemGenResult');
         if (resultDiv) resultDiv.style.display = 'none';
+        const customCodeEl = document.getElementById('redeemCustomCode');
+        if (customCodeEl) customCodeEl.value = '';
+        const customCodeGroup = document.getElementById('redeemCustomCodeGroup');
+        if (customCodeGroup) customCodeGroup.style.display = '';
+        const countEl = document.getElementById('redeemGenCount');
+        if (countEl) countEl.disabled = false;
         this.updatePreview();
+    },
+
+    /** 自定义码输入时：有值则锁定数量为 1 */
+    onCustomCodeInput() {
+        const val = (document.getElementById('redeemCustomCode')?.value || '').trim();
+        const countEl = document.getElementById('redeemGenCount');
+        if (val) {
+            if (countEl) { countEl.value = 1; countEl.disabled = true; }
+        } else {
+            if (countEl) { countEl.disabled = false; }
+        }
+    },
+
+    /** 数量输入时：数量 >1 则隐藏自定义码输入 */
+    onCountInput() {
+        const count = parseInt(document.getElementById('redeemGenCount')?.value) || 1;
+        const customCodeGroup = document.getElementById('redeemCustomCodeGroup');
+        if (customCodeGroup) customCodeGroup.style.display = count > 1 ? 'none' : '';
+        if (count > 1) {
+            const customCodeEl = document.getElementById('redeemCustomCode');
+            if (customCodeEl) customCodeEl.value = '';
+        }
     },
 
     /** 提交生成 */
@@ -817,7 +854,7 @@ const redeemModule = {
 
         const payload = this._buildPayload();
         const count = parseInt(document.getElementById('redeemGenCount')?.value) || 1;
-        const maxUses = parseInt(document.getElementById('redeemGenMaxUses')?.value) || 1;
+        const maxUses = this._readNonNegativeInt('redeemGenMaxUses', 1);
         const expireIn = parseInt(document.getElementById('redeemGenExpireIn')?.value) || 0;
         let note = document.getElementById('redeemGenNote')?.value?.trim() || '';
         const popupTitle = document.getElementById('redeemPopupTitle')?.value?.trim() || '';
@@ -874,6 +911,7 @@ const redeemModule = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     type, payload, max_uses: maxUses, count,
+                    custom_code: (document.getElementById('redeemCustomCode')?.value || '').trim(),
                     expire_in: expireIn, note,
                     popup_title: popupTitle,
                     popup_message: popupMessage,
@@ -1611,7 +1649,7 @@ const redeemModule = {
         const tag = document.getElementById('detailPayloadTag')?.value?.trim() || '';
         const payload = JSON.stringify({ theme, bonus, daily_limit_bonus, tag });
         const note = document.getElementById('detailNote')?.value?.trim() || '';
-        const maxUses = parseInt(document.getElementById('detailMaxUses')?.value) || 0;
+        const maxUses = this._readNonNegativeInt('detailMaxUses', 1);
         const popupTitle = document.getElementById('detailPopupTitle')?.value?.trim() || '';
         const popupMessage = document.getElementById('detailPopupMessage')?.value?.trim() || '';
         const popupStyle = document.getElementById('detailPopupStyle')?.value || 'default';
@@ -1886,7 +1924,7 @@ const redeemModule = {
             bonus: parseInt(document.getElementById('redeemPayloadBonus')?.value) || 0,
             daily_limit_bonus: parseInt(document.getElementById('redeemPayloadDailyBonus')?.value) || 0,
             tag: document.getElementById('redeemPayloadTag')?.value || '',
-            max_uses: parseInt(document.getElementById('redeemGenMaxUses')?.value) || 1,
+            max_uses: this._readNonNegativeInt('redeemGenMaxUses', 1),
             popup_title: document.getElementById('redeemPopupTitle')?.value?.trim() || '',
             popup_button: document.getElementById('redeemPopupButton')?.value?.trim() || '',
             popup_message: document.getElementById('redeemPopupMessage')?.value?.trim() || '',

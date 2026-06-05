@@ -456,13 +456,14 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 			c.JSON(200, gin.H{"themes": themes})
 		})
 
-		// 生成兑换码（单个或批量）
+		// 生成兑换码（单个或批量，支持自定义码）
 		redeem.POST("", func(c *gin.Context) {
 			var req struct {
 				Type           string `json:"type"`
 				Payload        string `json:"payload"`
-				MaxUses        int    `json:"max_uses"`
+				MaxUses        *int   `json:"max_uses"`
 				Count          int    `json:"count"`
+				CustomCode     string `json:"custom_code"`
 				Note           string `json:"note"`
 				ExpireIn       int    `json:"expire_in"`
 				PopupTitle     string `json:"popup_title"`
@@ -485,8 +486,12 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 			if req.Count > 100 {
 				req.Count = 100
 			}
-			if req.MaxUses <= 0 {
-				req.MaxUses = 1
+			maxUses := 1
+			if req.MaxUses != nil {
+				maxUses = *req.MaxUses
+			}
+			if maxUses < 0 {
+				maxUses = 1
 			}
 			if req.PopupStyle == "" {
 				req.PopupStyle = "default"
@@ -496,6 +501,22 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 				return
 			}
 
+			// 自定义码校验：统一大写，仅允许字母、数字、连字符，长度 3-32
+			customCode := strings.ToUpper(strings.TrimSpace(req.CustomCode))
+			if customCode != "" {
+				if len(customCode) < 3 || len(customCode) > 32 {
+					c.JSON(400, gin.H{"error": "自定义兑换码长度需在 3-32 个字符之间"})
+					return
+				}
+				for _, ch := range customCode {
+					if !((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-') {
+						c.JSON(400, gin.H{"error": "自定义兑换码仅允许字母、数字和连字符"})
+						return
+					}
+				}
+				req.Count = 1
+			}
+
 			var expiresAt *time.Time
 			if req.ExpireIn > 0 {
 				t := time.Now().Add(time.Duration(req.ExpireIn) * 24 * time.Hour)
@@ -503,11 +524,45 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 			}
 
 			created := make([]RedeemCode, 0, req.Count)
+
+			// 自定义码：直接入库，不走随机生成循环
+			if customCode != "" {
+				code := RedeemCode{
+					Code:           customCode,
+					Type:           req.Type,
+					Payload:        req.Payload,
+					MaxUses:        maxUses,
+					IsActive:       true,
+					Note:           req.Note,
+					ExpiresAt:      expiresAt,
+					PopupTitle:     req.PopupTitle,
+					PopupMessage:   req.PopupMessage,
+					PopupStyle:     req.PopupStyle,
+					PopupSubtitle:  req.PopupSubtitle,
+					PopupLogo:      req.PopupLogo,
+					PopupIconColor: req.PopupIconColor,
+					PopupBadgeText: req.PopupBadgeText,
+					PopupButton:    req.PopupButton,
+				}
+				if err := db.Create(&code).Error; err != nil {
+					if strings.Contains(strings.ToLower(err.Error()), "unique") {
+						c.JSON(409, gin.H{"error": "该兑换码已存在"})
+						return
+					}
+					log.Printf("[Redeem] 创建自定义兑换码失败: %v", err)
+					c.JSON(500, gin.H{"error": "创建失败"})
+					return
+				}
+				log.Printf("[Redeem] 创建自定义兑换码 %s (类型: %s)", customCode, req.Type)
+				c.JSON(200, gin.H{"status": "success", "codes": []RedeemCode{code}, "count": 1})
+				return
+			}
+
 			for i := 0; i < req.Count; i++ {
 				codeTemplate := RedeemCode{
 					Type:           req.Type,
 					Payload:        req.Payload,
-					MaxUses:        req.MaxUses,
+					MaxUses:        maxUses,
 					IsActive:       true,
 					Note:           req.Note,
 					ExpiresAt:      expiresAt,

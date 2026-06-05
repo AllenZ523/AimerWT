@@ -286,7 +286,7 @@ type RedeemCode struct {
 	Code           string     `gorm:"uniqueIndex;type:varchar(32)" json:"code"`
 	Type           string     `gorm:"type:varchar(32)" json:"type"`
 	Payload        string     `gorm:"type:text" json:"payload"`
-	MaxUses        int        `json:"max_uses" gorm:"default:1"`
+	MaxUses        int        `json:"max_uses"`
 	UsedCount      int        `json:"used_count" gorm:"default:0"`
 	ExpiresAt      *time.Time `json:"expires_at"`
 	IsActive       bool       `json:"is_active" gorm:"default:true"`
