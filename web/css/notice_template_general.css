@@ -153,6 +153,14 @@
     font-weight: 800;
 }
 
+.notice-article-summary {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-sec);
+    opacity: 0.9;
+}
+
 .notice-article-date {
     margin-top: 8px;
     font-size: 12px;

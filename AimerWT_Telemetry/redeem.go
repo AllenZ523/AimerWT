@@ -388,12 +388,15 @@ func executeRedeemPayload(store *gorm.DB, machineID string, redeemCode *RedeemCo
 	cmd := map[string]interface{}{
 		"type":             "redeem_result",
 		"success":          true,
+		"redeem_type":      redeemCode.Type,
 		"title":            title,
 		"message":          resultMsg,
 		"popup_style":      redeemCode.PopupStyle,
 		"popup_subtitle":   redeemCode.PopupSubtitle,
 		"popup_logo":       redeemCode.PopupLogo,
 		"popup_icon_color": redeemCode.PopupIconColor,
+		"popup_badge_text": redeemCode.PopupBadgeText,
+		"popup_button":     redeemCode.PopupButton,
 		"theme_unlocked":   themeUnlocked,
 	}
 	if themeUnlocked {
@@ -468,6 +471,8 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 				PopupSubtitle  string `json:"popup_subtitle"`
 				PopupLogo      string `json:"popup_logo"`
 				PopupIconColor string `json:"popup_icon_color"`
+				PopupBadgeText string `json:"popup_badge_text"`
+				PopupButton    string `json:"popup_button"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(400, gin.H{"error": "参数错误"})
@@ -512,6 +517,8 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 					PopupSubtitle:  req.PopupSubtitle,
 					PopupLogo:      req.PopupLogo,
 					PopupIconColor: req.PopupIconColor,
+					PopupBadgeText: req.PopupBadgeText,
+					PopupButton:    req.PopupButton,
 				}
 
 				var createdCode RedeemCode
@@ -556,6 +563,8 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 				PopupSubtitle  *string `json:"popup_subtitle"`
 				PopupLogo      *string `json:"popup_logo"`
 				PopupIconColor *string `json:"popup_icon_color"`
+				PopupBadgeText *string `json:"popup_badge_text"`
+				PopupButton    *string `json:"popup_button"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(400, gin.H{"error": "参数错误"})
@@ -605,6 +614,12 @@ func initRedeemRoutes(admin *gin.RouterGroup) {
 			}
 			if req.PopupIconColor != nil {
 				updates["popup_icon_color"] = *req.PopupIconColor
+			}
+			if req.PopupBadgeText != nil {
+				updates["popup_badge_text"] = *req.PopupBadgeText
+			}
+			if req.PopupButton != nil {
+				updates["popup_button"] = *req.PopupButton
 			}
 			if len(updates) > 0 {
 				db.Model(&code).Updates(updates)

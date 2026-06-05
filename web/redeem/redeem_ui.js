@@ -9,22 +9,22 @@
     }
 
     const redeemTypeDefaults = {
-        sponsor_1: { style: 'style_sponsor_1', subtitle: '· 感谢支持 ·', button: '我们是好朋友', iconColor: '#64748b' },
-        sponsor_2: { style: 'style_sponsor_2', subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#0d9488' },
-        sponsor_3: { style: 'style_sponsor_3', subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#e8c9a0' },
-        sponsor_4: { style: 'style_sponsor_4', subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#fde68a' },
-        streamer: { style: 'style_streamer', subtitle: '· 专属福利 ·', button: '确认领取', iconColor: '#fcd34d' },
-        streamer_share: { style: 'style_streamer_share', subtitle: '· 分享福利 ·', button: '好的', iconColor: '#fde68a' },
-        custom: { style: 'style_sponsor_1', subtitle: '· 感谢支持 ·', button: '确定', iconColor: '#64748b' },
+        sponsor_1: { style: 'style_sponsor_1', subtitle: '· 感谢支持 ·', button: '我们是好朋友', iconColor: '#64748b', badgeText: 'SUPPORTER · LEVEL 1' },
+        sponsor_2: { style: 'style_sponsor_2', subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#0d9488', badgeText: 'SUPPORTER · LEVEL 2' },
+        sponsor_3: { style: 'style_sponsor_3', subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#e8c9a0', badgeText: 'SUPPORTER · LEVEL 3' },
+        sponsor_4: { style: 'style_sponsor_4', subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#fde68a', badgeText: 'SUPPORTER · LEVEL 4' },
+        streamer: { style: 'style_streamer', subtitle: '· 专属福利 ·', button: '确认领取', iconColor: '#fcd34d', badgeText: 'STREAMER EXCLUSIVE' },
+        streamer_share: { style: 'style_streamer_share', subtitle: '· 分享福利 ·', button: '好的', iconColor: '#fde68a', badgeText: 'STREAMER SHARE' },
+        custom: { style: 'style_sponsor_1', subtitle: '· 感谢支持 ·', button: '确定', iconColor: '#64748b', badgeText: '' },
     };
 
     const redeemStyleDefaults = {
-        style_sponsor_1: { subtitle: '· 感谢支持 ·', button: '我们是好朋友', iconColor: '#64748b' },
-        style_sponsor_2: { subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#0d9488' },
-        style_sponsor_3: { subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#e8c9a0' },
-        style_sponsor_4: { subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#fde68a' },
-        style_streamer: { subtitle: '· 专属福利 ·', button: '确认领取', iconColor: '#fcd34d' },
-        style_streamer_share: { subtitle: '· 分享福利 ·', button: '好的', iconColor: '#fde68a' },
+        style_sponsor_1: { subtitle: '· 感谢支持 ·', button: '我们是好朋友', iconColor: '#64748b', badgeText: 'SUPPORTER · LEVEL 1' },
+        style_sponsor_2: { subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#0d9488', badgeText: 'SUPPORTER · LEVEL 2' },
+        style_sponsor_3: { subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#e8c9a0', badgeText: 'SUPPORTER · LEVEL 3' },
+        style_sponsor_4: { subtitle: '· 感谢支持 ·', button: '永远的好朋友', iconColor: '#fde68a', badgeText: 'SUPPORTER · LEVEL 4' },
+        style_streamer: { subtitle: '· 专属福利 ·', button: '确认领取', iconColor: '#fcd34d', badgeText: 'STREAMER EXCLUSIVE' },
+        style_streamer_share: { subtitle: '· 分享福利 ·', button: '好的', iconColor: '#fde68a', badgeText: 'STREAMER SHARE' },
     };
 
     const redeemLogoSvgMap = {
@@ -34,6 +34,20 @@
         trophy: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2"/><path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><path d="M6 3h12v7a6 6 0 0 1-12 0V3z"/><path d="M12 16v2"/><path d="M8 22h8"/><path d="M8 22v-2h8v2"/></svg>',
         mic: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>',
         users: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+        heart: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+        shield: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+        diamond: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M2 9h20"/><path d="M10 3l-4 6 6 13 6-13-4-6"/></svg>',
+        rocket: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+        zap: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+        music: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+        camera: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+        bookmark: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
+        compass: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>',
+        feather: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>',
+        coffee: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
+        award: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
+        hexagon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
+        sun: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
     };
 
     const redeemStyleTemplates = {
@@ -49,7 +63,7 @@
             </svg>
         </div>
         <div style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:6px;">{{TITLE}}</div>
-        <div style="font-size:12px; color:#94a3b8; margin-bottom:4px; letter-spacing:0.5px;">SUPPORTER · LEVEL 1</div>
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:4px; letter-spacing:0.5px;">{{BADGE_TEXT}}</div>
         <div style="font-size:13px; color:#94a3b8; margin-bottom:20px; letter-spacing:1px;">{{SUBTITLE}}</div>
         <div style="background:#f8fafc; border-radius:10px; padding:14px 16px; text-align:left; margin-bottom:20px;">
             {{REWARDS}}
@@ -67,7 +81,7 @@
             </svg>
         </div>
         <div style="font-size:19px; font-weight:700; color:#0f172a; margin-bottom:6px;">{{TITLE}}</div>
-        <div style="font-size:12px; color:#0d9488; margin-bottom:4px; letter-spacing:0.5px; font-weight:500;">SUPPORTER · LEVEL 2</div>
+        <div style="font-size:12px; color:#0d9488; margin-bottom:4px; letter-spacing:0.5px; font-weight:500;">{{BADGE_TEXT}}</div>
         <div style="font-size:13px; color:#0d9488; margin-bottom:20px; letter-spacing:1px;">{{SUBTITLE}}</div>
         <div style="background:#f0fdfa; border:1px solid #ccfbf1; border-radius:10px; padding:14px 16px; text-align:left; margin-bottom:20px;">
             {{REWARDS}}
@@ -85,7 +99,7 @@
             </svg>
         </div>
         <div style="font-size:20px; font-weight:700; color:#fdf4e7; margin-bottom:6px;">{{TITLE}}</div>
-        <div style="font-size:12px; color:#d4a574; margin-bottom:4px; letter-spacing:1px; font-weight:600;">SUPPORTER · LEVEL 3</div>
+        <div style="font-size:12px; color:#d4a574; margin-bottom:4px; letter-spacing:1px; font-weight:600;">{{BADGE_TEXT}}</div>
         <div style="font-size:13px; color:#e8c9a0; margin-bottom:22px; letter-spacing:1px;">{{SUBTITLE}}</div>
         <div style="background:rgba(212,165,116,0.1); border:1px solid rgba(212,165,116,0.2); border-radius:12px; padding:16px 18px; text-align:left; margin-bottom:22px; color:#f5e6d3;">
             {{REWARDS}}
@@ -107,7 +121,7 @@
             </svg>
         </div>
         <div style="font-size:22px; font-weight:700; color:#fef9c3; margin-bottom:6px; letter-spacing:0.3px;">{{TITLE}}</div>
-        <div style="font-size:11px; color:#fbbf24; margin-bottom:4px; letter-spacing:2px; font-weight:700; text-transform:uppercase;">Supporter · Level 4</div>
+        <div style="font-size:11px; color:#fbbf24; margin-bottom:4px; letter-spacing:2px; font-weight:700; text-transform:uppercase;">{{BADGE_TEXT}}</div>
         <div style="font-size:13px; color:#fbbf24; margin-bottom:24px; letter-spacing:1px;">{{SUBTITLE}}</div>
         <div style="background:rgba(251,191,36,0.06); border:1px solid rgba(251,191,36,0.15); border-radius:14px; padding:18px 20px; text-align:left; margin-bottom:24px; color:#fef3c7;">
             {{REWARDS}}
@@ -128,7 +142,7 @@
             </svg>
         </div>
         <div style="font-size:19px; font-weight:700; color:#fefce8; margin-bottom:6px;">{{TITLE}}</div>
-        <div style="font-size:12px; color:#fcd34d; margin-bottom:4px; letter-spacing:1px; font-weight:600;">STREAMER EXCLUSIVE</div>
+        <div style="font-size:12px; color:#fcd34d; margin-bottom:4px; letter-spacing:1px; font-weight:600;">{{BADGE_TEXT}}</div>
         <div style="font-size:13px; color:#fde68a; margin-bottom:20px; letter-spacing:1px;">{{SUBTITLE}}</div>
         <div style="background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.18); border-radius:10px; padding:14px 16px; text-align:left; margin-bottom:20px; color:#fef3c7;">
             {{REWARDS}}
@@ -149,7 +163,7 @@
             </svg>
         </div>
         <div style="font-size:19px; font-weight:700; color:#fefce8; margin-bottom:6px;">{{TITLE}}</div>
-        <div style="font-size:12px; color:#fde68a; margin-bottom:4px; letter-spacing:1px; font-weight:600;">STREAMER SHARE</div>
+        <div style="font-size:12px; color:#fde68a; margin-bottom:4px; letter-spacing:1px; font-weight:600;">{{BADGE_TEXT}}</div>
         <div style="font-size:13px; color:#fef3c7; margin-bottom:20px; letter-spacing:1px;">{{SUBTITLE}}</div>
         <div style="background:rgba(253,224,71,0.06); border:1px solid rgba(253,224,71,0.15); border-radius:10px; padding:14px 16px; text-align:left; margin-bottom:20px; color:#fef3c7;">
             {{REWARDS}}
@@ -250,12 +264,14 @@
         const title = String(command.title || '兑换成功').trim() || '兑换成功';
         const subtitle = String(command.popup_subtitle || '').trim() || typeDefaults.subtitle || styleDefaults.subtitle || '· 感谢支持 ·';
         const iconColor = normalizeIconColor(command.popup_icon_color) || typeDefaults.iconColor || styleDefaults.iconColor || '#64748b';
-        const buttonText = typeDefaults.button || styleDefaults.button || '确定';
+        const buttonText = String(command.popup_button || '').trim() || typeDefaults.button || styleDefaults.button || '确定';
+        const badgeText = String(command.popup_badge_text || '').trim() || typeDefaults.badgeText || styleDefaults.badgeText || '';
         let html = template
             .replace('{{TITLE}}', escapeHtml(title))
             .replace('{{SUBTITLE}}', escapeHtml(subtitle))
             .replace('{{BUTTON}}', escapeHtml(buttonText))
             .replace('{{ICON_COLOR}}', iconColor)
+            .replace('{{BADGE_TEXT}}', escapeHtml(badgeText))
             .replace('{{REWARDS}}', buildRewardHtml(command.message));
 
         const popupLogo = String(command.popup_logo || '').trim();

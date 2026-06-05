@@ -44,6 +44,32 @@ func noticePushKey(item NoticeItem) string {
 	return fmt.Sprintf("notice_%d_%s", item.ID, hash)
 }
 
+func requestBaseURL(c *gin.Context) string {
+	scheme := "http"
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + c.Request.Host
+}
+
+func normalizeAdCarouselItemsForClient(items []AdCarouselItem, baseURL string) []AdCarouselItem {
+	normalized := make([]AdCarouselItem, len(items))
+	copy(normalized, items)
+	for i := range normalized {
+		if len(normalized[i].Image) > 0 && normalized[i].Image[0] == '/' {
+			normalized[i].Image = baseURL + normalized[i].Image
+		}
+	}
+	return normalized
+}
+
+func adCarouselPushKey(items []AdCarouselItem, intervalMs int) string {
+	return computePushContentHash(map[string]interface{}{
+		"items":       items,
+		"interval_ms": intervalMs,
+	})
+}
+
 func summarizeUserCommand(command string) (string, string) {
 	command = strings.TrimSpace(command)
 	if command == "" {
@@ -1465,9 +1491,9 @@ func initRouter(r *gin.Engine) {
 				}
 
 				// 广告轮播
-				adCarouselItems := LoadAdCarouselItems()
+				adCarouselItems := normalizeAdCarouselItemsForClient(LoadAdCarouselItems(), requestBaseURL(c))
 				if len(adCarouselItems) > 0 {
-					hash := computePushContentHash(adCarouselItems)
+					hash := adCarouselPushKey(adCarouselItems, LoadAdCarouselInterval())
 					delivered := countDelivered("ad_carousel", hash)
 					adClickFilters := make([]clickFilter, 0, len(adCarouselItems))
 					for _, item := range adCarouselItems {
@@ -2567,24 +2593,12 @@ func initRouter(r *gin.Engine) {
 		}
 
 		// 构建广告轮播数据供客户端同步（图片路径补全为完整 URL）
-		items := LoadAdCarouselItems()
+		baseURL := requestBaseURL(c)
+		items := normalizeAdCarouselItemsForClient(LoadAdCarouselItems(), baseURL)
 		adIntervalMs := LoadAdCarouselInterval()
-		scheme := "http"
-		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
-			scheme = "https"
-		}
-		baseURL := scheme + "://" + c.Request.Host
-		for i := range items {
-			if len(items[i].Image) > 0 && items[i].Image[0] == '/' {
-				items[i].Image = baseURL + items[i].Image
-			}
-		}
-		adCarouselPushKey := computePushContentHash(map[string]interface{}{
-			"items":       items,
-			"interval_ms": adIntervalMs,
-		})
-		contentCacheKeys["ad_carousel"] = adCarouselPushKey
-		if clientContentKeys["ad_carousel"] != adCarouselPushKey {
+		adCarouselCacheKey := adCarouselPushKey(items, adIntervalMs)
+		contentCacheKeys["ad_carousel"] = adCarouselCacheKey
+		if clientContentKeys["ad_carousel"] != adCarouselCacheKey {
 			adJSON, _ := json.Marshal(items)
 			var parsed interface{}
 			json.Unmarshal(adJSON, &parsed)
@@ -2692,7 +2706,7 @@ func initRouter(r *gin.Engine) {
 				db.Exec("INSERT OR IGNORE INTO push_delivery_logs (machine_id, push_type, push_key, delivered_at) VALUES (?, ?, ?, ?)",
 					machineID, "notice", pushKey, time.Now())
 			}
-		}(record.MachineID, clientConfig, adCarouselPushKey, kbPushKey, noticePushKeys)
+		}(record.MachineID, clientConfig, adCarouselCacheKey, kbPushKey, noticePushKeys)
 
 		c.JSON(200, response)
 	})

@@ -295,6 +295,8 @@ type RedeemCode struct {
 	PopupSubtitle  string     `gorm:"type:varchar(128)" json:"popup_subtitle"`
 	PopupLogo      string     `gorm:"type:varchar(32)" json:"popup_logo"`
 	PopupIconColor string     `gorm:"type:varchar(16)" json:"popup_icon_color"`
+	PopupBadgeText string     `gorm:"type:varchar(128)" json:"popup_badge_text"`
+	PopupButton    string     `gorm:"type:varchar(64)" json:"popup_button"`
 	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 

@@ -881,12 +881,16 @@ class AppApi:
         keys = cache.get("content_cache_keys")
         if not isinstance(keys, dict):
             return {}
+        ready_keys = cache.get("content_cache_ready_keys")
+        if not isinstance(ready_keys, dict):
+            ready_keys = {}
 
         result = {}
 
         def put_if_ready(name, ready):
             value = str(keys.get(name) or "").strip()
-            if ready and value:
+            ready_value = str(ready_keys.get(name) or "").strip()
+            if ready and value and ready_value == value:
                 result[name] = value
 
         put_if_ready("notice_items", isinstance(cache.get("notice_items"), list))
@@ -1140,8 +1144,12 @@ class AppApi:
 
         try:
             content_cache_keys = config.get("content_cache_keys")
-            if isinstance(content_cache_keys, dict):
-                self._save_server_cache(content_cache_keys=content_cache_keys)
+            if not isinstance(content_cache_keys, dict):
+                content_cache_keys = {}
+
+            def content_cache_key_for(name):
+                value = str(content_cache_keys.get(name) or "").strip()
+                return {name: value} if value else None
 
             # 0. 用户功能开关（优先注入，让设置页和公告弹窗及时响应）
             feature_flags = self._extract_user_feature_flags(config)
@@ -1232,7 +1240,12 @@ class AppApi:
                 if force or self._last_ad_carousel_state != ad_state:
                     self._window.evaluate_js(self._build_ad_carousel_apply_js(ad_items, ad_interval_ms))
                     self._last_ad_carousel_state = ad_state
-                    self._save_server_cache(ad_carousel={"items": _ad_items_for_cache, "interval_ms": ad_interval_ms})
+                    ad_cache_key = content_cache_key_for("ad_carousel")
+                    self._save_server_cache(
+                        ad_carousel={"items": _ad_items_for_cache, "interval_ms": ad_interval_ms},
+                        content_cache_keys=ad_cache_key,
+                        ready_content_cache_keys=ad_cache_key
+                    )
 
             # 5.5 信息库广告位远程覆盖（下载图片到本地缓存，注入 Data URI 到前端）
             kb_ads = config.get("knowledge_ads_items")
@@ -1274,7 +1287,12 @@ class AppApi:
                         "})();"
                     )
                     self._last_knowledge_ads_state = kb_state
-                    self._save_server_cache(knowledge_ads=_kb_ads_for_cache)
+                    kb_cache_key = content_cache_key_for("knowledge_ads")
+                    self._save_server_cache(
+                        knowledge_ads=_kb_ads_for_cache,
+                        content_cache_keys=kb_cache_key,
+                        ready_content_cache_keys=kb_cache_key
+                    )
 
             # 6. 公告列表远程覆盖
             notice_items = config.get("notice_items")
@@ -1296,7 +1314,12 @@ class AppApi:
                         })
                     self._window.evaluate_js(self._build_notice_items_apply_js(mapped))
                     self._last_notice_items_state = notice_state
-                    self._save_server_cache(notice_items=mapped)
+                    notice_cache_key = content_cache_key_for("notice_items")
+                    self._save_server_cache(
+                        notice_items=mapped,
+                        content_cache_keys=notice_cache_key,
+                        ready_content_cache_keys=notice_cache_key
+                    )
 
             # 6.5 公告表情反应摘要注入
             notice_reactions = config.get("notice_reactions")
@@ -1476,7 +1499,8 @@ class AppApi:
             ad_carousel=None,
             banner_payload=None,
             knowledge_ads=None,
-            content_cache_keys=None):
+            content_cache_keys=None,
+            ready_content_cache_keys=None):
         """将服务器下发的公告/广告数据持久化到本地缓存文件（开发模式跳过）"""
         if getattr(self, '_is_dev_mode', False):
             return
@@ -1490,6 +1514,21 @@ class AppApi:
                     cache[key] = value
                     changed = True
 
+            def merge_cache_keys(key, values):
+                if not isinstance(values, dict):
+                    return
+                safe_keys = {
+                    str(k): str(v)
+                    for k, v in values.items()
+                    if k and v
+                }
+                if not safe_keys:
+                    return
+                current = cache.get(key)
+                merged = dict(current) if isinstance(current, dict) else {}
+                merged.update(safe_keys)
+                set_if_changed(key, merged)
+
             if notice_items is not None:
                 set_if_changed("notice_items", notice_items)
             if ad_carousel is not None:
@@ -1499,12 +1538,9 @@ class AppApi:
             if knowledge_ads is not None:
                 set_if_changed("knowledge_ads", knowledge_ads)
             if content_cache_keys is not None:
-                safe_keys = {
-                    str(k): str(v)
-                    for k, v in content_cache_keys.items()
-                    if k and v
-                } if isinstance(content_cache_keys, dict) else {}
-                set_if_changed("content_cache_keys", safe_keys)
+                merge_cache_keys("content_cache_keys", content_cache_keys)
+            if ready_content_cache_keys is not None:
+                merge_cache_keys("content_cache_ready_keys", ready_content_cache_keys)
             if not changed:
                 return
             cache_file = self._server_cache_file

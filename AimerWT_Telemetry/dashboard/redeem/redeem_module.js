@@ -37,7 +37,7 @@ const redeemModule = {
         'custom': 'style_sponsor_1',
     },
 
-    // Logo SVG 映射（弹窗中的图标）
+    // Logo SVG 映射（弹窗中的图标，单色镂空风格）
     _logoSvgMap: {
         'gift': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>',
         'star': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
@@ -45,6 +45,20 @@ const redeemModule = {
         'trophy': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2"/><path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><path d="M6 3h12v7a6 6 0 0 1-12 0V3z"/><path d="M12 16v2"/><path d="M8 22h8"/><path d="M8 22v-2h8v2"/></svg>',
         'mic': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>',
         'users': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+        'heart': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+        'shield': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+        'diamond': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M2 9h20"/><path d="M10 3l-4 6 6 13 6-13-4-6"/></svg>',
+        'rocket': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+        'zap': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+        'music': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+        'camera': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+        'bookmark': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
+        'compass': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>',
+        'feather': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>',
+        'coffee': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
+        'award': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
+        'hexagon': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
+        'sun': '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
     },
 
     _defaultSubtitleMap: {
@@ -65,6 +79,17 @@ const redeemModule = {
         'streamer': '#fcd34d',
         'streamer_share': '#fde68a',
         'custom': '#64748b',
+    },
+
+    // 各预设类型的默认徽章文案（弹窗中标题下方的小字标签）
+    _defaultBadgeTextMap: {
+        'sponsor_1': 'SUPPORTER · LEVEL 1',
+        'sponsor_2': 'SUPPORTER · LEVEL 2',
+        'sponsor_3': 'SUPPORTER · LEVEL 3',
+        'sponsor_4': 'SUPPORTER · LEVEL 4',
+        'streamer': 'STREAMER EXCLUSIVE',
+        'streamer_share': 'STREAMER SHARE',
+        'custom': '',
     },
 
     // ─────────── 预设类型定义（与后端 redeemPresets 映射） ───────────
@@ -115,10 +140,11 @@ const redeemModule = {
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || '主题列表读取失败');
             const themes = Array.isArray(data.themes) ? data.themes : [];
-            this._themeOptions = themes
+            const fallbackThemes = this._getFallbackThemeOptions();
+            const mappedThemes = themes
                 .filter(item => item && item.filename)
                 .map(item => ({
-                    source: item.source || 'remote',
+                    source: item.source === 'local' ? 'local' : 'remote',
                     filename: String(item.filename || ''),
                     name: item.name || item.filename,
                     author: item.author || '',
@@ -127,6 +153,11 @@ const redeemModule = {
                     status: item.status || 'active',
                     sort_order: Number(item.sort_order || 100),
                 }));
+            const seenFilenames = new Set(mappedThemes.map(item => item.filename));
+            fallbackThemes.forEach(item => {
+                if (!seenFilenames.has(item.filename)) mappedThemes.push(item);
+            });
+            this._themeOptions = mappedThemes.length ? mappedThemes : fallbackThemes;
             this._themeOptions.forEach(item => {
                 this._themeDisplayNames[item.filename] = item.name || item.filename;
             });
@@ -167,6 +198,7 @@ const redeemModule = {
         const select = document.getElementById(selectId);
         if (!select) return;
         const selected = String(selectedValue || '');
+        if (!this._themeOptions.length) this._themeOptions = this._getFallbackThemeOptions();
         select.innerHTML = this._buildThemeOptionsHtml(selected);
         select.value = selected;
     },
@@ -191,6 +223,53 @@ const redeemModule = {
         return options.map((opt) =>
             `<option value="${this._escapeHtml(opt.value)}" ${opt.value === selectedValue ? 'selected' : ''}>${this._escapeHtml(opt.label)}</option>`
         ).join('');
+    },
+
+    _getPopupLogoOptions(selectedValue = 'default') {
+        const options = [
+            { value: 'default', label: '跟随弹窗样式' },
+            { value: 'gift', label: '礼物' },
+            { value: 'star', label: '星星' },
+            { value: 'crown', label: '皇冠' },
+            { value: 'trophy', label: '奖杯' },
+            { value: 'mic', label: '麦克风' },
+            { value: 'users', label: '用户组' },
+            { value: 'heart', label: '爱心' },
+            { value: 'shield', label: '盾牌' },
+            { value: 'diamond', label: '钻石' },
+            { value: 'rocket', label: '火箭' },
+            { value: 'zap', label: '闪电' },
+            { value: 'music', label: '音符' },
+            { value: 'camera', label: '相机' },
+            { value: 'bookmark', label: '书签' },
+            { value: 'compass', label: '指南针' },
+            { value: 'feather', label: '羽毛' },
+            { value: 'coffee', label: '咖啡' },
+            { value: 'award', label: '勋章' },
+            { value: 'hexagon', label: '六边形' },
+            { value: 'sun', label: '太阳' },
+        ];
+        if (selectedValue && !options.some((opt) => opt.value === selectedValue)) {
+            options.push({ value: selectedValue, label: `保留当前值 (${selectedValue})` });
+        }
+        return options.map((opt) =>
+            `<option value="${this._escapeHtml(opt.value)}" ${opt.value === selectedValue ? 'selected' : ''}>${this._escapeHtml(opt.label)}</option>`
+        ).join('');
+    },
+
+    _replacePopupTemplate(template, replacements) {
+        let html = String(template || '');
+        Object.entries(replacements).forEach(([key, value]) => {
+            html = html.replaceAll(`{{${key}}}`, String(value ?? ''));
+        });
+        return html;
+    },
+
+    _replacePopupLogo(html, logoValue, iconColor) {
+        const logoSvg = this._logoSvgMap[logoValue];
+        if (!logoSvg) return html;
+        const coloredSvg = logoSvg.replaceAll('stroke="currentColor"', `stroke="${iconColor}"`);
+        return html.replace(/<svg[\s\S]*?<\/svg>/i, coloredSvg);
     },
 
     /** 从预设 payload JSON 中解析出可读的奖励列表，customLabels 可覆盖各项的默认文案 */
@@ -497,6 +576,8 @@ const redeemModule = {
             if (styleSelect) styleSelect.value = savedDefaults.popup_style_select || 'default';
             const logoSelect = document.getElementById('redeemPopupLogo');
             if (logoSelect) logoSelect.value = savedDefaults.popup_logo || 'default';
+            const badgeTextEl = document.getElementById('redeemPopupBadgeText');
+            if (badgeTextEl) badgeTextEl.value = savedDefaults.popup_badge_text || '';
             // 主播相关字段
             const noteTagEl = document.getElementById('redeemNoteTag');
             if (noteTagEl) noteTagEl.value = savedDefaults.note_tag || '';
@@ -529,6 +610,8 @@ const redeemModule = {
             if (styleSelect) styleSelect.value = 'default';
             const logoSelect = document.getElementById('redeemPopupLogo');
             if (logoSelect) logoSelect.value = 'default';
+            const badgeTextEl2 = document.getElementById('redeemPopupBadgeText');
+            if (badgeTextEl2) badgeTextEl2.value = '';
         } else {
             this._setThemeSelectValue('');
             document.getElementById('redeemPayloadBonus').value = 0;
@@ -546,6 +629,8 @@ const redeemModule = {
             if (styleSelect) styleSelect.value = 'default';
             const logoSelect = document.getElementById('redeemPopupLogo');
             if (logoSelect) logoSelect.value = 'default';
+            const badgeTextEl3 = document.getElementById('redeemPopupBadgeText');
+            if (badgeTextEl3) badgeTextEl3.value = '';
         }
 
         // 根据预设类型显示/隐藏主播相关行
@@ -589,7 +674,11 @@ const redeemModule = {
 
         // 确定当前选中的预设类型
         let presetType = 'sponsor_1';
-        if (this._selectedPreset !== null && this._selectedPreset !== 'custom') {
+        if (typeof this._selectedPreset === 'string' && this._selectedPreset.startsWith('cp_')) {
+            const cpIdx = parseInt(this._selectedPreset.replace('cp_', ''));
+            const cp = this._customPresets[cpIdx];
+            if (cp) presetType = cp.type;
+        } else if (this._selectedPreset !== null && this._selectedPreset !== 'custom') {
             const preset = this._presets[this._selectedPreset];
             if (preset) presetType = preset.type;
         } else if (this._selectedPreset === 'custom') {
@@ -614,16 +703,21 @@ const redeemModule = {
         const rewardItemsHtml = rewards.map(r =>
             `<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:13px;">` +
             `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; opacity:0.6;"><path d="M20 6L9 17l-5-5"/></svg>` +
-            `<span>${r.text}</span></div>`
+            `<span>${this._escapeHtml(r.text)}</span></div>`
         ).join('');
 
-        const displayTitle = customTitle || '兑换成功';
+        const displayTitle = this._escapeHtml(customTitle || '兑换成功');
         const displayRewards = customMsg
-            ? `<div style="font-size:13px; line-height:1.6; white-space:pre-line;">${customMsg}</div>`
+            ? `<div style="font-size:13px; line-height:1.6; white-space:pre-line;">${this._escapeHtml(customMsg)}</div>`
             : rewardItemsHtml;
 
         const customSubtitle = document.getElementById('redeemPopupSubtitle')?.value?.trim() || '';
-        const displaySubtitle = customSubtitle || this._defaultSubtitleMap[presetType] || '· 感谢支持 ·';
+        let subtitleText = customSubtitle || this._defaultSubtitleMap[presetType] || '· 感谢支持 ·';
+        const streamerId = document.getElementById('redeemStreamerId')?.value?.trim() || '';
+        if (streamerId && (presetType === 'streamer_share' || styleName === 'style_streamer_share')) {
+            subtitleText = `· 来自${streamerId}的分享 ·`;
+        }
+        const displaySubtitle = this._escapeHtml(subtitleText);
 
         const iconColorEl = document.getElementById('redeemPopupIconColor');
         const defaultColor = this._defaultIconColorMap[presetType] || '#64748b';
@@ -638,30 +732,30 @@ const redeemModule = {
             sponsor_4: '永远的好朋友', streamer: '确认领取',
             streamer_share: '好的', custom: '确定'
         };
-        const displayButton = customButton || defaultButtons[presetType] || '确定';
+        const displayButton = this._escapeHtml(customButton || defaultButtons[presetType] || '确定');
 
         // 加载模板
         try {
             const res = await fetch(`redeem/popup_styles/${styleName}.html?t=${Date.now()}`);
             if (res.ok) this._popupStyleCache[styleName] = await res.text();
             let html = this._popupStyleCache[styleName] || '';
-            html = html.replace('{{TITLE}}', displayTitle)
-                       .replace('{{REWARDS}}', displayRewards)
-                       .replace('{{BUTTON}}', displayButton)
-                       .replace('{{SUBTITLE}}', displaySubtitle)
-                       .replace('{{ICON_COLOR}}', displayIconColor);
+            // 徽章文案：优先使用自定义，否则用默认值
+            const customBadgeText = document.getElementById('redeemPopupBadgeText')?.value?.trim() || '';
+            const displayBadgeText = this._escapeHtml(customBadgeText || this._defaultBadgeTextMap[presetType] || '');
+
+            html = this._replacePopupTemplate(html, {
+                TITLE: displayTitle,
+                REWARDS: displayRewards,
+                BUTTON: displayButton,
+                SUBTITLE: displaySubtitle,
+                ICON_COLOR: displayIconColor,
+                BADGE_TEXT: displayBadgeText,
+            });
 
             // Logo 替换：如果用户选择了自定义 Logo→替换模板中的 SVG
             const logoVal = document.getElementById('redeemPopupLogo')?.value || 'default';
-            if (logoVal !== 'default' && this._logoSvgMap[logoVal]) {
-                html = html.replace(/<svg[^>]*>.*?<\/svg>/is, this._logoSvgMap[logoVal]);
-            }
-
-            // 主播分享文案替换：将“分享福利”替换为“来自xxx的分享”
-            const streamerId = document.getElementById('redeemStreamerId')?.value?.trim() || '';
-            if (streamerId && (presetType === 'streamer_share' || styleName === 'style_streamer_share')) {
-                const currentSubtitle = customSubtitle || this._defaultSubtitleMap['streamer_share'];
-                html = html.replace(currentSubtitle, `· 来自${streamerId}的分享 ·`);
+            if (logoVal !== 'default') {
+                html = this._replacePopupLogo(html, logoVal, displayIconColor);
             }
 
             frame.innerHTML = html;
@@ -698,6 +792,8 @@ const redeemModule = {
         if (styleSelect) styleSelect.value = 'default';
         const logoSelect = document.getElementById('redeemPopupLogo');
         if (logoSelect) logoSelect.value = 'default';
+        const badgeTextEl = document.getElementById('redeemPopupBadgeText');
+        if (badgeTextEl) badgeTextEl.value = '';
         // 主播相关字段
         const noteTag = document.getElementById('redeemNoteTag');
         if (noteTag) noteTag.value = '';
@@ -784,7 +880,9 @@ const redeemModule = {
                     popup_style: popupStyle,
                     popup_subtitle: document.getElementById('redeemPopupSubtitle')?.value?.trim() || '',
                     popup_logo: document.getElementById('redeemPopupLogo')?.value || 'default',
-                    popup_icon_color: document.getElementById('redeemPopupIconColor')?.value || ''
+                    popup_icon_color: document.getElementById('redeemPopupIconColor')?.value || '',
+                    popup_badge_text: document.getElementById('redeemPopupBadgeText')?.value?.trim() || '',
+                    popup_button: document.getElementById('redeemPopupButton')?.value?.trim() || ''
                 })
             });
 
@@ -804,12 +902,13 @@ const redeemModule = {
         const div = document.getElementById('redeemGenResult');
         if (!div) return;
 
-        const codeItems = codes.map(c =>
-            `<div class="code-item">
-                <span class="code-text">${c.code}</span>
-                <button class="copy-btn" onclick="navigator.clipboard.writeText('${c.code}'); app.showAlert('已复制', 'success');">复制</button>
-            </div>`
-        ).join('');
+        const codeItems = codes.map(c => {
+            const safeCode = this._escapeHtml(c.code);
+            return `<div class="code-item">
+                <span class="code-text">${safeCode}</span>
+                <button class="copy-btn" onclick="navigator.clipboard.writeText('${safeCode}'); app.showAlert('已复制', 'success');">复制</button>
+            </div>`;
+        }).join('');
 
         div.innerHTML = `
             <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
@@ -1224,6 +1323,8 @@ const redeemModule = {
         const safePopupTitle = this._escapeHtml(code.popup_title || '');
         const safePopupMessage = this._escapeHtml(code.popup_message || '');
         const safePopupSubtitle = this._escapeHtml(code.popup_subtitle || '');
+        const safePopupBadgeText = this._escapeHtml(code.popup_badge_text || '');
+        const safePopupButton = this._escapeHtml(code.popup_button || '');
         const safeTag = this._escapeHtml(this._parseField(code.payload, 'tag'));
         const selectedTheme = this._parseField(code.payload, 'theme');
 
@@ -1398,6 +1499,21 @@ const redeemModule = {
                                     <input type="text" class="input rd-input" id="detailPopupSubtitle" value="${safePopupSubtitle}" placeholder="留空则用默认">
                                 </div>
                             </div>
+                            <div class="rd-form-row">
+                                <label class="rd-form-label">弹窗Logo</label>
+                                <select class="select rd-input" id="detailPopupLogo">
+                                    ${this._getPopupLogoOptions(code.popup_logo || 'default')}
+                                </select>
+                            </div>
+                            <div class="rd-form-row">
+                                <label class="rd-form-label">徽章文案</label>
+                                <input type="text" class="input rd-input" id="detailPopupBadgeText" value="${safePopupBadgeText}" placeholder="留空则用默认（如 SUPPORTER · LEVEL 1）">
+                                <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">弹窗标题下方的小字标签</div>
+                            </div>
+                            <div class="rd-form-row">
+                                <label class="rd-form-label">确认按钮文字</label>
+                                <input type="text" class="input rd-input" id="detailPopupButton" value="${safePopupButton}" placeholder="留空则用默认">
+                            </div>
                             <div class="rd-form-row-inline">
                                 <div class="rd-form-row" style="flex:1;">
                                     <label class="rd-form-label">弹窗样式</label>
@@ -1508,8 +1624,11 @@ const redeemModule = {
                     popup_title: popupTitle,
                     popup_message: popupMessage,
                     popup_style: popupStyle,
+                    popup_logo: document.getElementById('detailPopupLogo')?.value || 'default',
                     popup_subtitle: document.getElementById('detailPopupSubtitle')?.value?.trim() || '',
-                    popup_icon_color: document.getElementById('detailPopupIconColor')?.value || ''
+                    popup_icon_color: document.getElementById('detailPopupIconColor')?.value || '',
+                    popup_badge_text: document.getElementById('detailPopupBadgeText')?.value?.trim() || '',
+                    popup_button: document.getElementById('detailPopupButton')?.value?.trim() || ''
                 })
             });
             if (res.ok) {
@@ -1775,6 +1894,7 @@ const redeemModule = {
             popup_logo: document.getElementById('redeemPopupLogo')?.value || 'default',
             popup_subtitle: document.getElementById('redeemPopupSubtitle')?.value?.trim() || '',
             popup_icon_color: document.getElementById('redeemPopupIconColor')?.value || '',
+            popup_badge_text: document.getElementById('redeemPopupBadgeText')?.value?.trim() || '',
             note_tag: document.getElementById('redeemNoteTag')?.value?.trim() || '',
             streamer_id: document.getElementById('redeemStreamerId')?.value?.trim() || '',
             reward_labels: this._collectRewardLabels() || {},

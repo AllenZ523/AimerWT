@@ -27,7 +27,7 @@
                 <div class="payload-editor-left">
                     <div class="payload-row">
                         <div class="payload-label"><span class="label-icon">🎨</span> 主题文件</div>
-                        <select class="input" style="flex: 1; max-width: 160px;" id="redeemPayloadTheme" onchange="redeemModule._renderRewardLabelFields(); redeemModule.updatePreview()">
+                        <select class="input" style="flex: 1; min-width: 260px; max-width: 360px;" id="redeemPayloadTheme" onchange="redeemModule._renderRewardLabelFields(); redeemModule.updatePreview()">
                             <option value="">不解锁主题</option>
                         </select>
                     </div>
@@ -109,11 +109,16 @@
                 <div class="redeem-form-grid">
                     <div class="form-group">
                         <label>自定义弹窗标题</label>
-                        <input type="text" class="input" style="width: 100%;" id="redeemPopupTitle" placeholder="留空则用默标题" oninput="redeemModule.updatePreview()">
+                        <input type="text" class="input" style="width: 100%;" id="redeemPopupTitle" placeholder="留空则用默认标题" oninput="redeemModule.updatePreview()">
                     </div>
                     <div class="form-group">
                         <label>弹窗副标题</label>
                         <input type="text" class="input" style="width: 100%;" id="redeemPopupSubtitle" placeholder="留空则用默认（如 · 感谢支持 ·）" oninput="redeemModule.updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>徽章文案</label>
+                        <input type="text" class="input" style="width: 100%;" id="redeemPopupBadgeText" placeholder="留空则用默认（如 SUPPORTER · LEVEL 1）" oninput="redeemModule.updatePreview()">
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">弹窗标题下方的小字标签</div>
                     </div>
                     <div class="form-group">
                         <label>弹窗样式</label>
@@ -137,6 +142,20 @@
                             <option value="trophy">🏆 奖杯</option>
                             <option value="mic">🎙️ 麦克风</option>
                             <option value="users">👥 用户组</option>
+                            <option value="heart">❤️ 爱心</option>
+                            <option value="shield">🛡️ 盾牌</option>
+                            <option value="diamond">💎 钻石</option>
+                            <option value="rocket">🚀 火箭</option>
+                            <option value="zap">⚡ 闪电</option>
+                            <option value="music">🎵 音符</option>
+                            <option value="camera">📷 相机</option>
+                            <option value="bookmark">🔖 书签</option>
+                            <option value="compass">🧭 指南针</option>
+                            <option value="feather">🪶 羽毛</option>
+                            <option value="coffee">☕ 咖啡</option>
+                            <option value="award">🏅 勋章</option>
+                            <option value="hexagon">⬡ 六边形</option>
+                            <option value="sun">☀️ 太阳</option>
                         </select>
                     </div>
                     <div class="form-group">

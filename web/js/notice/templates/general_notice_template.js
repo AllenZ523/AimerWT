@@ -26,6 +26,9 @@
         const titleHtml = title
             ? ('        <h3 class="notice-article-title">' + helpers.escapeHtml(title) + '</h3>')
             : '';
+        const summaryHtml = item.summary
+            ? ('        <div class="notice-article-summary">' + helpers.escapeHtml(item.summary) + '</div>')
+            : '';
         return '' +
             '<div class="' + modalClass + '">' +
             '  <div class="nc-left-col">' +
@@ -34,6 +37,7 @@
             '      <div class="notice-article-bell"><i class="ri-notification-3-line"></i></div>' +
             '      <div>' +
             titleHtml +
+            summaryHtml +
             '        <div class="notice-article-date">Release Date: ' + helpers.escapeHtml(item.date || data.date || '') + '</div>' +
             '      </div>' +
             '    </div>' +
