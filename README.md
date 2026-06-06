@@ -1,14 +1,38 @@
+<!-- markdownlint-disable MD033 MD041 -->
+<div align="center">
+  <img alt="AimerWT Logo" src="./web/assets/logo.ico" width="160" height="160" />
+
 # Aimer WT
 
-用于 War Thunder 的语音包管理/安装工具。桌面端基于 Python + PyWebview，前端静态资源在 `web/` 目录。
+  <p align="center">
+    War Thunder 一站式资源管理工具
+    <br/>
+    <a href="#english">English</a> | <a href="https://github.com/AimerSo/Aimer_WT/issues">报告 Bug</a>
+  </p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/Platform-Windows%20|%20Linux-0078D7?style=flat-square&logo=Windows" alt="Platform" />
+    <img src="https://img.shields.io/badge/Language-Python-3776AB?style=flat-square&logo=Python&logoColor=white" alt="Language" />
+    <img alt="license" src="https://img.shields.io/github/license/AimerSo/Aimer_WT?style=flat-square" />
+    <br/>
+    <a href="https://space.bilibili.com/1379084732" target="_blank"><img alt="Bilibili" src="https://img.shields.io/badge/Bilibili-AimerSo-00A1D6?style=flat-square&logo=bilibili" /></a>
+    <img alt="stars" src="https://img.shields.io/github/stars/AimerSo/Aimer_WT?style=flat-square&logo=github&color=darkgreen" />
+  </p>
+</div>
 
-**上传的文件都经过了opus重构和注释，应该比我自己的要工整许多。**
+## 本软件的介绍
+AimerWT 是一款专为《战争雷霆》玩家打造的一站式资源管理工具，它支持语音包的一键替换与卸载，并针对涂装、任务、场景及模型提供直观的可视化管理界面。除此之外软件还内置了游戏字体自定义功能，能够自定义功能，基本都有做适配。
+
+桌面端基于 Python + PyWebview，前端静态资源在 `web/` 目录。
+
+## <span id="english">ENGLISH</span>
+AimerWT is a comprehensive, all-in-one resource management tool designed specifically for WarThunder players. It features one-click installation and removal of voice packs, alongside an intuitive visual interface for managing camouflages, missions, hangars, and models. Additionally, it includes a built-in font customization engine with broad compatibility for personalizing in-game text.
 
 ## 开发者信息
 
 - **作者：** AimerSo
 - **B站主页：** [个人主页](https://space.bilibili.com/1379084732)
-
+**上传的文件都经过了opus重构和注释，应该比我自己的要工整许多。**
+  
 ## 功能
 
 - 自动检测/配置游戏路径
@@ -19,16 +43,24 @@
 
 ## 环境要求
 
-- Windows
+- Windows/Linux
+- Microsoft Edge WebView2 Runtime（Windows only）
 - Python（建议 3.10+，以你本地可运行版本为准）
 - 依赖：pywebview
+## 🐧 Linux / Steam Deck 支持
+本项目已适配 Linux (Arch/Debian) 及 Wayland 环境：
+- ✅ 支持全盘 Steam 库自动检索
+- ✅ 解决 Wayland 环境下渲染黑屏问题
+- ✅ 支持手动选择路径与语音包管理
+
+> **注意**：Linux 用户请务必查看 [Linux 使用指南](docs/LINUX.md) 以安装必要依赖和配置环境变量。
 
 ## 快速开始（源码运行）
 
 1. 安装依赖（最小示例）：
 
 ```bash
-pip install pywebview
+pip install -r requirements.txt
 ```
 
 2. 启动：
@@ -36,6 +68,11 @@ pip install pywebview
 ```bash
 python main.py
 ```
+
+## 启动参数（可选）
+
+- `--allow-fallback`：当 WebView2 不可用且 edgechromium 启动失败时，允许尝试降级启动（可能导致部分界面不可用）。
+- `--perf`：开启部分接口的性能日志输出。
 
 ## 目录结构说明
 
@@ -62,6 +99,13 @@ python main.py
 欢迎支持和参与Aimer WT的开发！  
 - 如果您想要赞助，可以在管理器中找到赞助链接，也可以在交流群中联系作者赞助  
 - 如果您想要参与开发，欢迎任何贡献，但如果可以请优先处理issue中的问题，我们会尽快处理您的pr
+
+## 隐私声明
+
+本程序包含一个轻量级的匿名遥测系统，旨在帮助开发者了解应用使用情况并优化跨平台兼容性。
+- **匿名设备标识**：通过对 CPU、磁盘、主板等硬件信息进行“加盐哈希（Salted Hash）”处理，生成全局唯一的匿名机器码（HWID）。我们**不会**获取或上传任何原始硬件序列号或文件系统指纹。
+- **数据收集范围**：仅收集非敏感的系统信息，包括操作系统版本、处理器架构（Arch）、应用版本号、地区/语种设置及心跳状态。
+- **数据安全**：所有数据均通过安全链接传输，仅用于统计活跃用户量及环境特征分析，不涉及任何个人隐私、账号信息或本地文件内容。
 
 ## 许可协议
 本项目采用 GNU General Public License v3.0（GPL-3.0）开源，详见 `LICENSE` 文件。

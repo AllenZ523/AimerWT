@@ -1,0 +1,1069 @@
+/**
+ * 资源库公共模板样式
+ * 功能定位: 涂装库/炮镜库/任务库/模型库/机库 共用的新版布局
+ *
+ * 布局结构:
+ *   - 顶部工具栏（搜索 + 视图切换 + 批量操作）
+ *   - 左侧内容区（全选 + 排序 + 卡片网格 + 分页）
+ *   - 右侧面板（操作面板 + 存储空间 + 快速入口）
+ *
+ * 业务关联:
+ *   - #view-skins / #view-sights / #view-tasks / #view-models / #view-hangar
+ */
+
+/* ===========================
+   页面级覆盖样式
+   =========================== */
+
+/* 副功能库页面去掉四周间距，空间全部留给内容区 */
+#page-camo {
+    padding: 0;
+    overflow: hidden;
+}
+
+#page-camo.active {
+    display: flex;
+    flex-direction: column;
+}
+
+#page-camo .resource-master-detail {
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+}
+
+/* 左侧导航栏贴边、去圆角 */
+#page-camo .resource-nav {
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid var(--border-color);
+    box-shadow: none;
+}
+
+/* 右侧内容区贴边、去圆角 */
+#page-camo .resource-content {
+    border-radius: 0;
+    border: none;
+    flex: 1;
+    min-height: 0;
+}
+
+/* 使用新模板的视图需要去掉默认 padding */
+#view-skins,
+#view-sights,
+#view-tasks,
+#view-models,
+#view-hangar {
+    padding: 0;
+    overflow: hidden;
+}
+
+/* ===========================
+   顶部工具栏
+   =========================== */
+
+.res-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.res-toolbar .res-search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0 12px;
+    height: 36px;
+    min-width: 200px;
+    flex: 1;
+    max-width: 340px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.res-toolbar .res-search-box:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.12);
+}
+
+.res-toolbar .res-search-box i {
+    font-size: 16px;
+    color: var(--text-sec);
+    flex-shrink: 0;
+}
+
+.res-toolbar .res-search-box input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 13px;
+    color: var(--text-main);
+    flex: 1;
+    min-width: 0;
+}
+
+.res-toolbar .res-search-box input::placeholder {
+    color: var(--text-sec);
+    opacity: 0.7;
+}
+
+/* 工具栏右侧区域 */
+.res-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+#view-skins .res-toolbar,
+#view-sights .res-toolbar,
+#view-tasks .res-toolbar,
+#view-models .res-toolbar,
+#view-hangar .res-toolbar {
+    flex-wrap: nowrap;
+}
+
+#view-skins .res-toolbar .res-search-box,
+#view-sights .res-toolbar .res-search-box,
+#view-tasks .res-toolbar .res-search-box,
+#view-models .res-toolbar .res-search-box,
+#view-hangar .res-toolbar .res-search-box {
+    flex: 0 1 272px;
+    max-width: 272px;
+}
+
+.res-toolbar-inline-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: var(--text-sec);
+    font-size: 13px;
+}
+
+.res-toolbar .res-select-all {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    color: var(--text-sec);
+    font-size: 13px;
+}
+
+.res-toolbar .res-select-all input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.res-toolbar-inline-controls .res-item-count {
+    white-space: nowrap;
+}
+
+.res-toolbar-inline-controls .res-sort-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    position: relative;
+}
+
+.res-toolbar-inline-controls .res-sort-wrapper .app-dropdown-wrapper {
+    width: 108px !important;
+}
+
+.res-toolbar-inline-controls .res-sort-wrapper .app-dropdown-trigger {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 7px;
+    background: var(--bg-body);
+    font-size: 12px;
+    box-shadow: none;
+}
+
+.res-toolbar-inline-controls .res-sort-wrapper .app-dropdown-wrapper.active .app-dropdown-trigger {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.12);
+}
+
+.res-toolbar-inline-controls .res-sort-wrapper .app-dropdown-menu {
+    z-index: 30;
+}
+
+.res-toolbar-inline-controls .res-sort-wrapper .app-dropdown-option {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-left: none;
+}
+
+.res-toolbar-inline-controls .res-sort-wrapper .app-dropdown-option:hover,
+.res-toolbar-inline-controls .res-sort-wrapper .app-dropdown-option.selected {
+    border-left: none;
+}
+
+.res-native-sort {
+    position: absolute;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0;
+    pointer-events: none;
+    margin: 0;
+}
+
+/* 视图切换按钮组 */
+.res-view-toggle {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, 36px);
+    align-items: center;
+    width: 78px;
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 3px;
+    overflow: hidden;
+    height: 34px;
+    box-sizing: border-box;
+}
+
+.res-view-toggle::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 36px;
+    height: 26px;
+    border-radius: 6px;
+    background: var(--primary);
+    box-shadow: 0 4px 10px rgba(255, 153, 0, 0.28);
+    transform: translateX(0);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.res-view-toggle.is-list-mode::before {
+    transform: translateX(36px);
+}
+
+.res-view-toggle button {
+    position: relative;
+    z-index: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-sec);
+    padding: 0;
+    width: 36px;
+    height: 26px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: color 0.18s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
+.res-view-toggle button.active {
+    color: #fff;
+}
+
+.res-view-toggle button:not(.active):hover {
+    color: var(--primary);
+}
+
+.res-view-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
+}
+
+/* 批量操作按钮 */
+.res-batch-btn {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--primary);
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+    color: #fff;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.res-batch-btn:hover {
+    box-shadow: 0 4px 12px rgba(255, 153, 0, 0.35);
+    transform: translateY(-1px);
+}
+
+.res-batch-btn:active {
+    transform: translateY(0);
+}
+
+/* ===========================
+   主体布局：内容区 + 右侧面板
+   =========================== */
+
+.res-body {
+    display: flex;
+    flex: 1;
+    height: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+/* 左侧内容区 */
+.res-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+/* 内容头栏：全选 + 计数 + 排序 */
+.res-list-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--text-sec);
+}
+
+.res-list-header .res-select-all {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.res-list-header .res-select-all input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.res-list-header .res-item-count {
+    color: var(--text-sec);
+    font-size: 13px;
+}
+
+.res-list-header .res-sort-wrapper {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.res-list-header .res-sort-wrapper select {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-body);
+    color: var(--text-main);
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    outline: none;
+}
+
+.res-list-header .res-sort-wrapper select:focus {
+    border-color: var(--primary);
+}
+
+/* 卡片网格容器（兼容旧 small-card 和新 res-card） */
+.res-card-grid {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    align-content: start;
+}
+
+.res-card-grid:has(> .res-empty-state:only-child) {
+    flex: 1;
+    min-height: 360px;
+    align-content: center;
+}
+
+.res-card-grid.is-list-view {
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.res-card-grid.is-list-view .small-card {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    align-items: center;
+    min-height: 74px;
+}
+
+.res-card-grid.is-list-view .small-card-img-wrapper {
+    width: 84px;
+    height: 64px;
+}
+
+.res-card-grid.is-list-view .small-card-img {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+}
+
+.res-card-grid.is-list-view .small-card-body {
+    min-width: 0;
+    padding: 8px 12px;
+}
+
+.res-card-grid .small-card.is-selected,
+.res-card-grid .res-card.is-selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.18);
+}
+
+#view-skins #skins-list,
+#view-sights #sights-list,
+#view-tasks #tasks-list,
+#view-models #models-list,
+#view-hangar #hangar-list {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+#view-skins #skins-list:has(> .res-empty-state:only-child),
+#view-sights #sights-list:has(> .res-empty-state:only-child),
+#view-tasks #tasks-list:has(> .res-empty-state:only-child),
+#view-models #models-list:has(> .res-empty-state:only-child),
+#view-hangar #hangar-list:has(> .res-empty-state:only-child) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+}
+
+/* 资源卡片 - 横向布局（名称 + 预览图 + 标签 + 信息） */
+.res-card {
+    display: flex;
+    gap: 12px;
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.res-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+[data-theme="dark"] .res-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.res-card .res-card-cover {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.res-card .res-card-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.res-card .res-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+}
+
+.res-card .res-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.res-card .res-card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.res-card .res-card-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.res-card .res-card-tag.tag-type {
+    background: rgba(255, 153, 0, 0.12);
+    color: var(--primary);
+}
+
+.res-card .res-card-tag.tag-source {
+    background: rgba(34, 197, 94, 0.12);
+    color: #16a34a;
+}
+
+[data-theme="dark"] .res-card .res-card-tag.tag-source {
+    color: #4ade80;
+}
+
+.res-card .res-card-meta {
+    font-size: 12px;
+    color: var(--text-sec);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.res-card .res-card-meta span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.res-card .res-card-actions-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-sec);
+    font-size: 18px;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.res-card:hover .res-card-actions-btn {
+    opacity: 1;
+}
+
+.res-card .res-card-actions-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .res-card .res-card-actions-btn {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .res-card .res-card-actions-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* 分页区域 */
+.res-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+    font-size: 13px;
+}
+
+.res-pagination button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-body);
+    color: var(--text-sec);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.res-pagination button:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.res-pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.res-pagination .res-page-num {
+    min-width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-body);
+    color: var(--text-sec);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    transition: all 0.2s;
+    padding: 0 6px;
+}
+
+.res-pagination .res-page-num.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+
+.res-pagination .res-page-size {
+    margin-left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-sec);
+    font-size: 12px;
+}
+
+.res-pagination .res-page-size select {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-body);
+    color: var(--text-main);
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    outline: none;
+}
+
+/* ===========================
+   右侧面板
+   =========================== */
+
+.res-side-panel {
+    width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    overflow-y: auto;
+    border-left: 1px solid var(--border-color);
+    align-self: stretch;
+    position: sticky;
+    top: 0;
+    height: 100%;
+    max-height: 100%;
+}
+
+/* 面板卡片 */
+.res-panel-card {
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.res-panel-card .res-panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.res-panel-card .res-panel-title i {
+    font-size: 16px;
+    color: var(--primary);
+}
+
+/* 操作面板 */
+.res-ops-card {
+    padding: 10px 14px 8px;
+}
+
+.res-ops-card .res-panel-title {
+    margin-bottom: 6px;
+}
+
+.res-ops-hint {
+    font-size: 12px;
+    color: var(--text-sec);
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
+
+.res-ops-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-bottom: 0;
+}
+
+.res-ops-actions button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-sec);
+    cursor: pointer;
+    min-height: 36px;
+    padding: 3px 2px;
+    border-radius: 8px;
+    transition: all 0.2s;
+    font-size: 11px;
+}
+
+.res-ops-actions button i {
+    font-size: 16px;
+}
+
+.res-ops-actions button:hover {
+    background: rgba(255, 153, 0, 0.08);
+    color: var(--primary);
+}
+
+.res-ops-move-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-body);
+    color: var(--text-main);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.res-ops-move-btn:hover {
+    border-color: var(--primary);
+    background: rgba(255, 153, 0, 0.04);
+}
+
+.res-ops-move-btn i {
+    font-size: 16px;
+    color: var(--primary);
+}
+
+/* 存储空间 */
+.res-storage-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.res-storage-detail {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-sec);
+}
+
+.res-storage-detail span:last-child {
+    color: var(--text-main);
+    font-weight: 600;
+    text-align: right;
+}
+
+.res-storage-bar {
+    height: 8px;
+    background: var(--bg-body);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.res-storage-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #f97316);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* 快速入口 */
+.res-quick-links {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.res-quick-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    text-align: left;
+    width: 100%;
+}
+
+.res-quick-link:hover {
+    background: rgba(255, 153, 0, 0.06);
+    color: var(--primary);
+}
+
+.res-quick-link i {
+    font-size: 16px;
+    color: var(--text-sec);
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.res-quick-link:hover i {
+    color: var(--primary);
+}
+
+/* ===========================
+   空状态
+   =========================== */
+
+.res-empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    align-self: center;
+    width: min(560px, 100%);
+    padding: 20px;
+    color: var(--text-sec);
+    text-align: center;
+    transform: none;
+}
+
+.res-empty-state i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.res-empty-state h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 8px;
+}
+
+.res-empty-state p {
+    font-size: 13px;
+    color: var(--text-sec);
+}
+
+/* ===========================
+   筛选与排序方向控件
+   =========================== */
+
+/* 筛选下拉容器：与排序下拉平行 */
+.res-filter-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    position: relative;
+}
+
+.res-filter-wrapper i.res-filter-icon {
+    font-size: 14px;
+    color: var(--text-sec);
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-wrapper {
+    width: 90px !important;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-trigger {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 7px;
+    background: var(--bg-body);
+    font-size: 12px;
+    box-shadow: none;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-wrapper.active .app-dropdown-trigger {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.12);
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-menu {
+    z-index: 30;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-option {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-left: none;
+}
+
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-option:hover,
+.res-toolbar-inline-controls .res-filter-wrapper .app-dropdown-option.selected {
+    border-left: none;
+}
+
+/* 隐藏的原生筛选 select */
+.res-native-filter {
+    position: absolute;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0;
+    pointer-events: none;
+    margin: 0;
+}
+
+/* 排序方向切换按钮 */
+.res-sort-order-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--bg-body);
+    color: var(--text-sec);
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.res-sort-order-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(255, 153, 0, 0.06);
+}
+
+.res-sort-order-btn:active {
+    transform: scale(0.93);
+}
+
+.res-sort-order-btn i {
+    transition: transform 0.25s ease;
+}
+
+.res-sort-order-btn.is-asc i {
+    transform: scaleY(-1);
+}
+
+/* ===========================
+   深色模式适配
+   =========================== */
+
+[data-theme="dark"] .res-toolbar .res-search-box {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .res-view-toggle {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .res-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .res-panel-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .res-storage-bar {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .res-pagination button {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ===========================
+   动画
+   =========================== */
+
+.res-card.animate-in {
+    animation: resCardFadeIn 0.3s ease forwards;
+}
+
+@keyframes resCardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
