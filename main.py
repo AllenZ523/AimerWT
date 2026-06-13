@@ -6442,7 +6442,7 @@ class AppApi:
             latest = str(data.get("latest_version", "") or "").strip()
             if not latest:
                 return {"success": True, "has_update": False, "current": APP_VERSION,
-                        "message": "服务端暂未配置版本信息"}
+                        "message": "当前已是最新版本"}
 
             has_update = latest != APP_VERSION
             result = {
