@@ -39,6 +39,12 @@ jobs:
           set -euo pipefail
           SHOULD="true"
 
+          # 仅主仓库执行构建
+          if [ "${{ github.repository }}" != "AimerSo/AimerWT" ]; then
+            echo "Release workflow only runs in AimerSo/AimerWT (current: ${{ github.repository }})"
+            SHOULD="false"
+          fi
+
           # workflow_dispatch 必須在 main 上觸發
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ "${{ github.ref_name }}" != "main" ]; then
@@ -90,7 +96,7 @@ jobs:
   build:
     name: Build on ${{ matrix.os }} (${{ matrix.arch }})
     needs: prepare
-    if: needs.prepare.outputs.should_release == 'true'
+    if: needs.prepare.outputs.should_release == 'true' && github.repository == 'AimerSo/AimerWT'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -187,7 +193,7 @@ jobs:
   release:
     name: Create Release
     needs: [prepare, build]
-    if: needs.prepare.outputs.should_release == 'true' && needs.build.result == 'success'
+    if: needs.prepare.outputs.should_release == 'true' && github.repository == 'AimerSo/AimerWT' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
