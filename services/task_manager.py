@@ -27,7 +27,7 @@ from services.resource_index_cache import ResourceIndexCache
 log = get_logger(__name__)
 
 # 定义标准文件夹名称
-DIR_RESOURCE_ROOT = "../AimerWT资源库"
+DIR_RESOURCE_ROOT = "AimerWT资源库"
 DIR_TASK_LIBRARY = f"{DIR_RESOURCE_ROOT}/WT任务库"
 
 # 封面文件名

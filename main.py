@@ -6853,7 +6853,7 @@ class AppApi:
             if pending_dir == "":
                 # 重设为预设
                 self._cfg_mgr.set_pending_dir("")
-                default_pending = self._lib_mgr.root_dir / ".." / DEFAULT_PENDING_DIR_NAME
+                default_pending = Path(self._lib_mgr.get_current_paths()["default_pending_dir"])
                 self._lib_mgr.update_paths(pending_dir=str(default_pending))
                 log.info(f"待解压区已重设为预设路径: {default_pending}")
                 return {"success": True}
@@ -6884,9 +6884,7 @@ class AppApi:
             if library_dir == "":
                 # 重设为预设
                 self._cfg_mgr.set_library_dir("")
-                default_library = (
-                    self._lib_mgr.root_dir / ".." / DEFAULT_RESOURCE_ROOT_DIR_NAME / DEFAULT_VOICE_LIBRARY_DIR_NAME
-                )
+                default_library = Path(self._lib_mgr.get_current_paths()["default_library_dir"])
                 self._lib_mgr.update_paths(library_dir=str(default_library))
                 self._refresh_sound_replace_backup_root()
                 log.info(f"语音包库已重设为预设路径: {default_library}")

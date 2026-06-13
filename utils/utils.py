@@ -58,7 +58,7 @@ def get_app_data_dir() -> Path:
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent
     else:
-        return Path(__file__).parent
+        return Path(__file__).resolve().parent.parent
 
 
 # ==================== 多编码兼容工具 ====================

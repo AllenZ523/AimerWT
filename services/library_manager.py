@@ -32,8 +32,8 @@ from wt.wt_sound import VoiceType, Country
 log = get_logger(__name__)
 
 # 定义标准文件夹名称
-DIR_PENDING = "../待解压区"
-DIR_RESOURCE_ROOT = "../AimerWT资源库"
+DIR_PENDING = "待解压区"
+DIR_RESOURCE_ROOT = "AimerWT资源库"
 DIR_LIBRARY = f"{DIR_RESOURCE_ROOT}/WT语音包库"
 
 
