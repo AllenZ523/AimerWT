@@ -6,6 +6,7 @@
 """
 import os
 import sys
+import subprocess
 import platform
 from pathlib import Path
 from logging import getLogger
@@ -58,7 +59,7 @@ def get_app_data_dir() -> Path:
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent
     else:
-        return Path(__file__).resolve().parent.parent
+        return Path(__file__).parent
 
 
 # ==================== 多编码兼容工具 ====================
@@ -218,3 +219,5 @@ def safe_filename(filename: str, replacement: str = "_") -> str:
         filename = "unnamed"
     
     return filename
+
+

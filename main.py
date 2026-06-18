@@ -3463,8 +3463,18 @@ class AppApi:
             self._model_mgr.open_model_library_folder()
         elif folder_type == "hangar_library":
             self._hangar_mgr.open_hangar_library_folder()
+        elif folder_type == "logs":
+            self.open_log_folder()
+        
 
         # 未列入允许名单的 folder_type 不执行任何操作
+
+
+    def open_log_folder(self,*args, **kwargs):
+        from utils.logger import _get_log_dir
+        log_dir = Path(_get_log_dir())
+        self._lib_mgr._open_folder_cross_platform(log_dir)
+
 
     def open_mod_folder(self, mod_name):
         # 打开语音包库中指定语音包目录。
