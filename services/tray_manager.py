@@ -96,10 +96,20 @@ class TrayManager:
         Returns:
             PIL Image 对象，如果 PIL 不可用则返回 None
         """
-        if Image is None or ImageDraw is None:
+        if Image is None:
             log.warning("PIL 不可用，无法创建托盘图标")
             return None
-        
+
+        icon_path = Path(__file__).resolve().parent.parent / "web" / "assets" / "app_icon.ico"
+        try:
+            with Image.open(icon_path) as icon:
+                return icon.convert("RGBA").resize((width, height), Image.LANCZOS)
+        except Exception as e:
+            log.warning(f"加载托盘图标失败，使用默认图标: {e}")
+
+        if ImageDraw is None:
+            return None
+
         # 创建一个简单的橙色圆形图标
         image = Image.new('RGBA', (width, height), (0, 0, 0, 0))
         dc = ImageDraw.Draw(image)
