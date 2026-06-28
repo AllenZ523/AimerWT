@@ -5386,7 +5386,7 @@ i[class^="ri-"] {
 
 .toast-error {
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
     z-index: 40001;
     min-width: 320px;
@@ -5473,24 +5473,24 @@ i[class^="ri-"] {
 @keyframes toastSlideIn {
     from {
         opacity: 0;
-        transform: translateX(100%);
+        transform: translateY(100%);
     }
 
     to {
         opacity: 1;
-        transform: translateX(0);
+        transform: translateY(0);
     }
 }
 
 @keyframes toastSlideOut {
     from {
         opacity: 1;
-        transform: translateX(0);
+        transform: translateY(0);
     }
 
     to {
         opacity: 0;
-        transform: translateX(100%);
+        transform: translateY(100%);
     }
 }
 
@@ -5501,7 +5501,7 @@ i[class^="ri-"] {
 
 .toast-warn {
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
     z-index: 40001;
     min-width: 320px;
@@ -5592,7 +5592,7 @@ i[class^="ri-"] {
 
 .toast-info {
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
     z-index: 40001;
     min-width: 320px;
@@ -5682,28 +5682,28 @@ i[class^="ri-"] {
 }
 
 .toast-error.show {
-    top: 20px;
+    bottom: 20px;
 }
 
 .toast-warn.show {
-    top: 20px;
+    bottom: 20px;
 }
 
 .toast-info.show {
-    top: 20px;
+    bottom: 20px;
 }
 
 .toast-error.show~.toast-warn.show,
 .toast-error.show~.toast-info.show {
-    top: 100px;
+    bottom: 100px;
 }
 
 .toast-warn.show~.toast-info.show {
-    top: 100px;
+    bottom: 100px;
 }
 
 .toast-error.show~.toast-warn.show~.toast-info.show {
-    top: 180px;
+    bottom: 180px;
 }
 
 .drop-overlay {
