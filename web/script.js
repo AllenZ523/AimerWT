@@ -4952,7 +4952,9 @@ app.init = async function () {
             theme: "Light",
             installed_mods: [],
             ui_language: "",
+            background_paused: false,
         };
+        if (state.background_paused) this.setBackgroundPaused(true);
         this.applyUiLanguage(state.ui_language || this.detectPreferredUiLanguage());
 
         // 1.1 检查免责声明
