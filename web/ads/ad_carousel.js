@@ -55,6 +55,7 @@
         var transitionFallbackTimer = null;
         var hovered = false;
         var isAnimating = false;
+        var paused = !!window.__aimerwtBackgroundPaused;
         var total = items.length;
 
         var track = createEl("div", "ad-carousel-track");
@@ -202,6 +203,7 @@
 
         function startTimer() {
             stopTimer();
+            if (paused || document.hidden) return;
             if (total <= 1) return;
             timer = setInterval(function () {
                 if (!isHostVisible()) {
@@ -252,7 +254,12 @@
         }
 
         function onVisibilityChange() {
-            if (document.hidden) {
+            setPaused(document.hidden || !!window.__aimerwtBackgroundPaused);
+        }
+
+        function setPaused(nextPaused) {
+            paused = !!nextPaused;
+            if (paused) {
                 stopTimer();
                 hovered = false;
                 clearTransitionFallback();
@@ -293,6 +300,7 @@
 
         activeInstance = {
             host: host,
+            setPaused: setPaused,
             destroy: function () {
                 stopTimer();
                 clearTransitionFallback();
@@ -311,6 +319,7 @@
                 }
             }
         };
+        setPaused(paused || document.hidden);
     }
 
     function refreshAdCarousel() {
@@ -320,7 +329,12 @@
 
     window.AdCarouselModule = {
         init: initAdCarousel,
-        refresh: refreshAdCarousel
+        refresh: refreshAdCarousel,
+        setPaused: function (paused) {
+            if (activeInstance && typeof activeInstance.setPaused === "function") {
+                activeInstance.setPaused(paused);
+            }
+        }
     };
 
     if (document.readyState === "loading") {

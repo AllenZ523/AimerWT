@@ -82,6 +82,12 @@
     animation-play-state: paused;
 }
 
+#header_banner_slot.is-background-paused .header_banner_text.is_scrolling,
+#header_banner_slot.is-background-paused .header_banner[data-type="update"] i,
+#header_banner_slot.is-background-paused .header_banner_dot {
+    animation-play-state: paused;
+}
+
 @keyframes bannerTextScroll {
     0% {
         transform: translateX(var(--clip-width, 120px));

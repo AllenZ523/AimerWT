@@ -382,6 +382,10 @@
     outline: none;
 }
 
+html.app-background-paused * {
+    animation-play-state: paused !important;
+}
+
 body {
     margin: 0;
     padding: 0;

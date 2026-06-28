@@ -554,6 +554,7 @@ class AppApi:
         self._client_diagnostic_log_path = self._initialize_client_diagnostic_log()
 
         self._perf_enabled = bool(perf_enabled)
+        self._background_start_paused = False
 
         # 保存 PyWebview Window 引用（用于调用 evaluate_js 与打开系统对话框）
 
@@ -1548,6 +1549,9 @@ class AppApi:
         # 重放最近一次服务器配置，覆盖窗口和首页脚本尚未就绪的时机差。
         self._schedule_server_config_replay()
 
+    def set_background_start_paused(self, paused):
+        self._background_start_paused = bool(paused)
+
     def _save_server_cache(
             self,
             notice_items=None,
@@ -1911,7 +1915,8 @@ class AppApi:
             "autostart_enabled": self._cfg_mgr.get_autostart_enabled(),
             "tray_mode": self._cfg_mgr.get_tray_mode(),
             "close_confirm": self._cfg_mgr.get_close_confirm(),
-            "ui_language": self._cfg_mgr.get_ui_language()
+            "ui_language": self._cfg_mgr.get_ui_language(),
+            "background_paused": self._background_start_paused,
         }
 
     def ensure_telemetry_ready(self, timeout_ms=2500):
@@ -2345,6 +2350,10 @@ class AppApi:
         """
         if self._window:
             try:
+                try:
+                    self._window.evaluate_js("if(window.app && app.setBackgroundPaused) app.setBackgroundPaused(true);")
+                except Exception:
+                    pass
                 self._window.hide()
                 self._logger.info("[SYS] 窗口已最小化到托盘")
             except Exception as e:
@@ -7374,6 +7383,7 @@ def main() -> int:
 
     # 检查是否静默启动
     silent_mode = getattr(cli, "silent", False) or getattr(cli, "tray_only", False)
+    api.set_background_start_paused(silent_mode)
 
     # 创建窗口实例（x/y 指定启动位置）
     try:

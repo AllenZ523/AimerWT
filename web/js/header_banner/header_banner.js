@@ -24,6 +24,7 @@
     var HEADER_BANNER_EDGE_GAP = 10;
     var _resizeObserver = null;
     var _resizeRaf = null;
+    var _paused = false;
 
     var DEFAULT_SLOGANS = [];
 
@@ -172,6 +173,7 @@
     }
 
     function rotateNext() {
+        if (_paused || document.hidden) return;
         var sorted = getSortedItems();
         if (!sorted.length) return;
 
@@ -189,6 +191,7 @@
 
     function startRotation() {
         stopRotation();
+        if (_paused || document.hidden) return;
         var sorted = getSortedItems();
         if (sorted.length <= 1) return;
 
@@ -214,6 +217,24 @@
         _currentIndex = 0;
         renderItem(sorted[0]);
         startRotation();
+    }
+
+    function setPaused(paused) {
+        _paused = !!paused;
+        if (_container) {
+            _container.classList.toggle('is-background-paused', _paused);
+        }
+        hideTooltip();
+        if (_paused || document.hidden) {
+            stopRotation();
+            return;
+        }
+        calcMaxWidth();
+        startRotation();
+    }
+
+    function handleVisibilityChange() {
+        setPaused(document.hidden || !!window.__aimerwtBackgroundPaused);
     }
 
     function syncTextScroll(el) {
@@ -293,9 +314,11 @@
         calcMaxWidth();
         bindResizeObserver();
         window.addEventListener('resize', scheduleCalcMaxWidth);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         _items = DEFAULT_SLOGANS.slice();
         refreshDisplay();
+        handleVisibilityChange();
     }
 
     // === 公开 API ===
@@ -393,6 +416,7 @@
         pushAnnouncement: pushAnnouncement,
         clearUpdate: clearUpdate,
         clearAnnouncement: clearAnnouncement,
+        setPaused: setPaused,
         _setInterval: setRotateInterval
     };
 })();

@@ -2950,10 +2950,31 @@ const app = {
             clearInterval(this._telemetryStatusTimer);
             this._telemetryStatusTimer = 0;
         }
+        if (this._backgroundPaused) return;
         this.refreshTelemetryConnectionStatus();
         this._telemetryStatusTimer = window.setInterval(() => {
             this.refreshTelemetryConnectionStatus();
         }, 10000);
+    },
+
+    setBackgroundPaused(paused) {
+        this._backgroundPaused = !!paused;
+        window.__aimerwtBackgroundPaused = this._backgroundPaused;
+        document.documentElement.classList.toggle('app-background-paused', this._backgroundPaused);
+        if (window.HeaderBannerModule?.setPaused) HeaderBannerModule.setPaused(this._backgroundPaused);
+        if (window.AdCarouselModule?.setPaused) AdCarouselModule.setPaused(this._backgroundPaused);
+        if (this._backgroundPaused) {
+            if (this._telemetryStatusTimer) {
+                clearInterval(this._telemetryStatusTimer);
+                this._telemetryStatusTimer = 0;
+            }
+            return;
+        }
+        this.startTelemetryStatusPolling();
+    },
+
+    onWindowShown() {
+        this.setBackgroundPaused(false);
     },
 
     noticeData: (window.NoticeDataModule && typeof window.NoticeDataModule.getDefaultNoticeData === 'function')
@@ -3422,6 +3443,7 @@ const app = {
      * 最小化到托盘
      */
     minimizeToTray() {
+        this.setBackgroundPaused(true);
         if (window.pywebview?.api?.minimize_to_tray) {
             pywebview.api.minimize_to_tray();
         } else {
@@ -4930,7 +4952,9 @@ app.init = async function () {
             theme: "Light",
             installed_mods: [],
             ui_language: "",
+            background_paused: false,
         };
+        if (state.background_paused) this.setBackgroundPaused(true);
         this.applyUiLanguage(state.ui_language || this.detectPreferredUiLanguage());
 
         // 1.1 检查免责声明
