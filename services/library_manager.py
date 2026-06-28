@@ -15,6 +15,7 @@
 - 所有操作记录完整的错误上下文
 """
 import os
+import hashlib
 import platform
 import shutil
 import subprocess
@@ -403,16 +404,12 @@ class LibraryManager:
         """
         mod_dir = self.library_dir / mod_name
 
-        try:
-            current_mtime = mod_dir.stat().st_mtime
-        except Exception:
-            current_mtime = 0
+        self._normalize_wtlive_compat_files(mod_dir)
+        current_signature = self._get_dir_signature(mod_dir)
 
         cached = self._details_cache.get(mod_name)
-        if cached and cached.get("_mtime") == current_mtime:
+        if cached and cached.get("_signature") == current_signature:
             return cached
-
-        self._normalize_wtlive_compat_files(mod_dir)
 
         # 1. 默认数据
         # 尝试获取文件夹修改时间作为默认日期
@@ -624,9 +621,36 @@ class LibraryManager:
             })
 
         # 存入缓存
-        details["_mtime"] = current_mtime
+        details["_signature"] = current_signature
         self._details_cache[mod_name] = details
         return details
+
+    def _get_dir_signature(self, dir_path: Path) -> dict[str, Any]:
+        digest = hashlib.sha1()
+        file_count = 0
+        total_size = 0
+        max_mtime_ns = 0
+        try:
+            base = dir_path.resolve(strict=False)
+            for path in sorted(dir_path.rglob("*"), key=lambda p: str(p).lower()):
+                if not path.is_file():
+                    continue
+                stat = path.stat()
+                rel = path.resolve(strict=False).relative_to(base).as_posix()
+                mtime_ns = int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000)))
+                size = int(getattr(stat, "st_size", 0))
+                digest.update(f"{rel}\0{mtime_ns}\0{size}\n".encode("utf-8", errors="ignore"))
+                file_count += 1
+                total_size += size
+                max_mtime_ns = max(max_mtime_ns, mtime_ns)
+        except Exception:
+            pass
+        return {
+            "hash": digest.hexdigest(),
+            "file_count": file_count,
+            "size": total_size,
+            "mtime_ns": max_mtime_ns,
+        }
 
     @staticmethod
     def _normalize_preview_use_random_bank(raw, preview_audio_files=None):

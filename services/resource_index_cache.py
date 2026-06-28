@@ -11,6 +11,7 @@
 - 输出: 可复用的卡片数据记录与本地 JSON 缓存文件。
 """
 import json
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -89,10 +90,12 @@ class ResourceIndexCache:
                 if skip_hidden and child.name.startswith("."):
                     continue
                 stat = child.stat()
+                content = self._build_dir_content_signature(child)
                 signature.append({
                     "name": child.name,
                     "mtime_ns": self._mtime_ns(stat),
                     "size": int(getattr(stat, "st_size", 0)),
+                    **content,
                 })
         except Exception:
             return []
@@ -108,13 +111,42 @@ class ResourceIndexCache:
         item_stat = self._safe_stat(item)
         cover = Path(cover_path) if cover_path else None
         cover_stat = self._safe_stat(cover) if cover else None
+        content = self._build_dir_content_signature(item)
         return {
             "item_key": self._path_key(item),
             "item_mtime_ns": self._mtime_ns(item_stat),
             "item_size": int(getattr(item_stat, "st_size", 0)) if item_stat else 0,
+            **content,
             "cover_key": self._path_key(cover) if cover and cover.exists() else "",
             "cover_mtime_ns": self._mtime_ns(cover_stat),
             "cover_size": int(getattr(cover_stat, "st_size", 0)) if cover_stat else 0,
+        }
+
+    def _build_dir_content_signature(self, item_dir: Path) -> dict[str, Any]:
+        digest = hashlib.sha1()
+        file_count = 0
+        total_size = 0
+        max_mtime_ns = 0
+        try:
+            base = item_dir.resolve(strict=False)
+            for path in sorted(item_dir.rglob("*"), key=lambda p: str(p).lower()):
+                if not path.is_file():
+                    continue
+                stat = path.stat()
+                rel = path.resolve(strict=False).relative_to(base).as_posix()
+                mtime_ns = self._mtime_ns(stat)
+                size = int(getattr(stat, "st_size", 0))
+                digest.update(f"{rel}\0{mtime_ns}\0{size}\n".encode("utf-8", errors="ignore"))
+                file_count += 1
+                total_size += size
+                max_mtime_ns = max(max_mtime_ns, mtime_ns)
+        except Exception:
+            pass
+        return {
+            "content_hash": digest.hexdigest(),
+            "content_file_count": file_count,
+            "content_size": total_size,
+            "content_mtime_ns": max_mtime_ns,
         }
 
     @staticmethod

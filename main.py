@@ -1,6 +1,7 @@
 # 主程序入口与桌面桥接逻辑
 # -*- coding: utf-8 -*-
 import argparse
+import atexit
 import base64
 import csv
 import copy
@@ -103,6 +104,7 @@ DIAGNOSTIC_LOG_PATH = DIAGNOSTIC_TOOL_DIR / "diagnostic_events.jsonl"
 _diagnostic_recorder = None
 _diagnostic_recorder_checked = False
 _diagnostic_logger_attached = False
+_single_instance_lock_file = None
 
 
 def _get_remote_themes_dir() -> Path:
@@ -357,6 +359,59 @@ def _show_fatal_error(title: str, message: str) -> None:
 
     try:
         sys.stderr.write(f"{title}: {message}\n")
+    except Exception:
+        pass
+
+
+def _acquire_single_instance_lock(lock_path: Path | None = None) -> bool:
+    global _single_instance_lock_file
+    if _single_instance_lock_file is not None:
+        return True
+
+    lock_path = lock_path or (get_docs_data_dir() / "AimerWT.single-instance.lock")
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = open(lock_path, "a+b")
+        lock_file.seek(0)
+        if sys.platform == "win32":
+            import msvcrt
+
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        try:
+            lock_file.close()
+        except Exception:
+            pass
+        return False
+
+    _single_instance_lock_file = lock_file
+    return True
+
+
+def _release_single_instance_lock() -> None:
+    global _single_instance_lock_file
+    lock_file = _single_instance_lock_file
+    if lock_file is None:
+        return
+    _single_instance_lock_file = None
+    try:
+        lock_file.seek(0)
+        if sys.platform == "win32":
+            import msvcrt
+
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    except Exception:
+        pass
+    try:
+        lock_file.close()
     except Exception:
         pass
 
@@ -7209,6 +7264,11 @@ def main() -> int:
     _install_global_exception_handlers()
 
     cli = _parse_cli_args()
+
+    if not _acquire_single_instance_lock():
+        _show_fatal_error("Aimer WT 已在运行", "Aimer WT 已经在运行，请勿重复启动。")
+        return 0
+    atexit.register(_release_single_instance_lock)
 
     if webview is None:
         err = globals().get("_WEBVIEW_IMPORT_ERROR")
