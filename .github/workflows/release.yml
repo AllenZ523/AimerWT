@@ -1,19 +1,8 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
-  workflow_dispatch:
-    inputs:
-      manual_bump:
-        description: "Version Bump Type (選擇版本升級類型)"
-        type: choice
-        options:
-          - "patch"
-          - "minor"
-          - "major"
-        default: "patch"
+  release:
+    types: [published]
 
 permissions:
   contents: write
@@ -38,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           SHOULD="true"
+          TAG="${{ github.event.release.tag_name }}"
 
           # 仅主仓库执行构建
           if [ "${{ github.repository }}" != "AimerSo/AimerWT" ]; then
@@ -45,18 +35,15 @@ jobs:
             SHOULD="false"
           fi
 
-          # workflow_dispatch 必須在 main 上觸發
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${{ github.ref_name }}" != "main" ]; then
-              echo "workflow_dispatch must run from main (current: ${{ github.ref_name }})"
-              SHOULD="false"
-            fi
+          if [[ ! "$TAG" == v* ]]; then
+            echo "Release tag must start with v (current: $TAG)"
+            SHOULD="false"
           fi
 
-          # tag push 必須是 main 分支上的提交（可被 origin/main 包含）
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            git fetch origin main --force
-            if git merge-base --is-ancestor "${{ github.sha }}" "origin/main"; then
+          if [ "$SHOULD" = "true" ]; then
+            git fetch origin main:refs/remotes/origin/main --force
+            COMMIT="$(git rev-list -n 1 "$TAG")"
+            if git merge-base --is-ancestor "$COMMIT" "origin/main"; then
               echo "Tag commit is on main"
             else
               echo "Tag commit is NOT on main; skipping release"
@@ -66,29 +53,13 @@ jobs:
 
           echo "should_release=$SHOULD" >> "$GITHUB_OUTPUT"
 
-      - name: Run Semver (Manual Trigger)
-        id: semver
-        if: steps.guard.outputs.should_release == 'true' && github.event_name == 'workflow_dispatch'
-        uses: bitshifted/git-auto-semver@v2
-        with:
-          main_branch: main
-          initial_version: "1.0.0"
-          create_tag: true
-          tag_prefix: "v"
-          manual_bump: ${{ inputs.manual_bump }}
-
-      - name: Determine Final Version
+      - name: Determine Version
         id: version
         if: steps.guard.outputs.should_release == 'true'
         shell: bash
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            TAG="${{ github.ref_name }}"
-            VERSION="${TAG#v}"
-          else
-            VERSION="${{ steps.semver.outputs.version-string }}"
-            TAG="v$VERSION"
-          fi
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
@@ -129,6 +100,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -191,14 +164,14 @@ jobs:
           path: dist/*
 
   release:
-    name: Create Release
+    name: Attach Release Assets
     needs: [prepare, build]
     if: needs.prepare.outputs.should_release == 'true' && github.repository == 'AimerSo/AimerWT' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.tag_name }}
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -212,32 +185,15 @@ jobs:
           echo "Downloaded artifacts:"
           ls -la dist/ || echo "No artifacts found"
 
-      - name: Generate Release Name
-        id: release_name
+      - name: Upload assets to release
         shell: bash
-        run: |
-          MSG=$(git log -1 --pretty=%s)
-          TAG="${{ needs.prepare.outputs.tag_name }}"
-          echo "title=$TAG - $MSG" >> "$GITHUB_OUTPUT"
-      - name: Resolve changelog file by tag
-        id: notes
-        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="${{ needs.prepare.outputs.tag_name }}"   # 例如 v3
-          FILE="changelog_${TAG}.md"                    # => changelog_v3.md
-          if [ ! -f "$FILE" ]; then
-            echo "找不到更新日志文件: $FILE"
+          TAG="${{ needs.prepare.outputs.tag_name }}"
+          if ! compgen -G "dist/*" > /dev/null; then
+            echo "No release assets found in dist/"
             exit 1
           fi
-          echo "notes_file=$FILE" >> "$GITHUB_OUTPUT"
-          echo "Using changelog file: $FILE"
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ needs.prepare.outputs.tag_name }}
-          name: ${{ steps.release_name.outputs.title }}
-          draft: false
-          prerelease: false
-          body_path: ${{ steps.notes.outputs.notes_file }}
-          files: dist/*
+          gh release upload "$TAG" dist/* --repo "${{ github.repository }}" --clobber
