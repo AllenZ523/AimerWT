@@ -128,6 +128,24 @@ class SoundReplaceService:
         manifest["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
         self._save_json_atomic(self._active_manifest_path(game_backup_dir), manifest)
 
+    def _clear_active_entry(self, game_backup_dir: Path, manifest: dict, target_rel: str) -> int:
+        target_key = str(target_rel or "").lower()
+        entries = list(manifest.get("active_entries", []))
+        kept = [entry for entry in entries if str(entry.get("target_rel", "")).lower() != target_key]
+        manifest["active_entries"] = kept
+        self._save_active_manifest(game_backup_dir, manifest)
+        return len(entries) - len(kept)
+
+    def _target_changed_result(self, game_backup_dir: Path, manifest: dict, target_rel: str) -> dict:
+        cleared = self._clear_active_entry(game_backup_dir, manifest, target_rel)
+        return {
+            "success": False,
+            "error_code": "target_changed_externally",
+            "target_rel": target_rel,
+            "cleared_manifest_entries": cleared,
+            "error": "检测到游戏文件已更新或被校验恢复，已清除旧替换记录。请先校验游戏文件完整性或更新游戏后再重试。",
+        }
+
     def _copy_file_atomic(self, source: Path, target: Path):
         target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_name(f"{target.name}.aimerwt_tmp")
@@ -357,12 +375,7 @@ class SoundReplaceService:
                     if was_backup_skipped:
                         if current_sha != expected_sha:
                             self._cleanup_new_backups(newly_created_backups, originals_dir)
-                            return {
-                                "success": False,
-                                "error_code": "target_changed_externally",
-                                "target_rel": target_rel,
-                                "error": "检测到游戏文件已被外部修改，请先还原或校验游戏文件",
-                            }
+                            return self._target_changed_result(game_backup_dir, active_manifest, target_rel)
                         original_sha = active_entry.get("original_sha256", "")
                         is_backup_skipped = True
                     else:
@@ -378,12 +391,7 @@ class SoundReplaceService:
                             return {"success": False, "error_code": "backup_missing", "target_rel": target_rel}
                         if current_sha != expected_sha:
                             self._cleanup_new_backups(newly_created_backups, originals_dir)
-                            return {
-                                "success": False,
-                                "error_code": "target_changed_externally",
-                                "target_rel": target_rel,
-                                "error": "检测到游戏文件已被外部修改，请先还原或校验游戏文件",
-                            }
+                            return self._target_changed_result(game_backup_dir, active_manifest, target_rel)
                         original_sha = active_entry.get("original_sha256", "")
                 else:
                     if skip_backup:
@@ -623,8 +631,7 @@ class SoundReplaceService:
                 remaining_entries.append(entry)
                 continue
             if self._sha256(target_path) != entry.get("replacement_sha256"):
-                skipped_files.append({"target_rel": target_rel, "reason": "target_changed_externally"})
-                remaining_entries.append(entry)
+                skipped_files.append({"target_rel": target_rel, "reason": "target_changed_externally", "record_cleared": True})
                 continue
 
             try:
