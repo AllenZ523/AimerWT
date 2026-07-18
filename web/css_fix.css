@@ -1752,7 +1752,14 @@
     line-height: 1.5;
 }
 
+#modal-archive-password {
+    /* 保持密码弹窗位于解压进度遮罩（z-index: 30050）上方。 */
+    z-index: 31000;
+}
+
 #modal-archive-password .modal-content {
+    position: relative;
+    z-index: 1;
     text-align: left;
 }
 
